@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'ec2ex'
+
+Ec2ex::CLI.start
