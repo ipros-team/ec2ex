@@ -50,7 +50,7 @@ module Ec2ex
       list = @core.instances_hash({}, true).select { |instance| instance[:instance_lifecycle].nil? }
       list = list.map{ |_instance|
         ['instance_type', 'placement.availability_zone'].map do |key|
-          eval("instance.#{key} ")
+          eval("_instance.#{key} ")
         end.join('_')
       }
       result = {}
