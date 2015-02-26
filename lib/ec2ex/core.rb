@@ -5,6 +5,15 @@ module Ec2ex
   class Core
     def initialize
       @ec2 = Aws::EC2::Client.new
+      @elb = Aws::ElasticLoadBalancing::Client.new
+    end
+
+    def client
+      @ec2
+    end
+
+    def elb_client
+      @elb
     end
 
     def extract_fields(data, fields)

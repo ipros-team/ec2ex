@@ -2,7 +2,6 @@ require 'thor'
 require 'json'
 require 'pp'
 require 'hashie'
-require 'aws-sdk'
 require 'active_support/core_ext/hash'
 
 module Ec2ex
@@ -19,8 +18,8 @@ module Ec2ex
       super(args, options, config)
       @global_options = config[:shell].base.options
       @core = Core.new
-      @ec2 = Aws::EC2::Client.new
-      @elb = Aws::ElasticLoadBalancing::Client.new
+      @ec2 = @core.client
+      @elb = @core.elb_client
     end
 
     desc 'search', 'search instance'
