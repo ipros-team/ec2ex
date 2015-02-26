@@ -89,8 +89,8 @@ module Ec2ex
     end
 
     def create_image_with_instance(instance)
-      puts 'image creating...'
       tags = get_tag_hash(instance.tags)
+      puts "#{tags['Name']} image creating..."
       snapshot = {
         'created' => Time.now.strftime('%Y%m%d%H%M%S'),
         'tags' => instance.tags.map(&:to_hash).to_json,
