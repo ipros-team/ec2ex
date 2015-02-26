@@ -1,15 +1,31 @@
 require 'aws-sdk'
 require 'ipaddress'
+require 'open-uri'
 
+TIME_OUT = 3
 module Ec2ex
   class Core
     def initialize
+      ENV['AWS_REGION'] = ENV['AWS_REGION'] || get_metadata['region']
       @ec2 = Aws::EC2::Client.new
       @elb = Aws::ElasticLoadBalancing::Client.new
     end
 
     def client
       @ec2
+    end
+
+    def get_metadata
+      begin
+        result = {}
+        timeout(TIME_OUT) {
+          body = open('http://169.254.169.254/latest/dynamic/instance-identity/document/').read
+          result = JSON.parse(body)
+        }
+        return result
+      rescue TimeoutError => e
+        raise "not EC2 instance"
+      end
     end
 
     def elb_client
