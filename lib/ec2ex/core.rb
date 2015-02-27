@@ -52,7 +52,7 @@ module Ec2ex
     def format_tag(tag)
       tags = []
       tag.each do |k, v|
-        tags << { key: k, value: v }
+        tags << { key: k, value: v || '' }
       end
       tags
     end
