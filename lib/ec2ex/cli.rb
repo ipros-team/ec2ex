@@ -194,7 +194,7 @@ module Ec2ex
           network_interface = {
             device_index: 0,
             subnet_id: @core.get_subnet(private_ip_address).subnet_id,
-            groups: security_group_ids,
+            groups: option[:launch_specification][:security_group_ids],
             private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
           }
           option[:launch_specification][:network_interfaces] = [network_interface]
@@ -228,7 +228,9 @@ module Ec2ex
     desc 'run_spot', 'run_spot latest image'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :price, type: :string, required: true, desc: 'price'
+    option :private_ip_address, type: :string, default: nil, desc: 'private_ip_address'
     def run_spot
+      private_ip_address = options['private_ip_address']
       image = @core.latest_image_with_name(options['name'])
       tag_hash = @core.get_tag_hash(image[:tags])
       option = {
@@ -246,9 +248,9 @@ module Ec2ex
 
       network_interface = {
         device_index: 0,
-        subnet_id: @core.get_subnet(tag_hash.private_ip_address).subnet_id,
+        subnet_id: @core.get_subnet(private_ip_address || tag_hash.private_ip_address).subnet_id,
         groups: JSON.parse(tag_hash.security_groups),
-        private_ip_addresses: [{ private_ip_address: tag_hash.private_ip_address, primary: true }]
+        private_ip_addresses: [{ private_ip_address: private_ip_address || tag_hash.private_ip_address, primary: true }]
       }
       option[:launch_specification][:network_interfaces] = [network_interface]
 
