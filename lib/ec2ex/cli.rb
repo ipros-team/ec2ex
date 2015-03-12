@@ -229,6 +229,7 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :price, type: :string, required: true, desc: 'price'
     option :private_ip_address, type: :string, default: nil, desc: 'private_ip_address'
+    option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     def run_spot
       private_ip_address = options['private_ip_address']
       image = @core.latest_image_with_name(options['name'])
@@ -253,6 +254,7 @@ module Ec2ex
         private_ip_addresses: [{ private_ip_address: private_ip_address || tag_hash.private_ip_address, primary: true }]
       }
       option[:launch_specification][:network_interfaces] = [network_interface]
+      option[:launch_specification].merge!(eval(options['params']))
 
       response = @ec2.request_spot_instances(option)
       spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
