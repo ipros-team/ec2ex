@@ -69,7 +69,11 @@ module Ec2ex
     def create_image
       results = @core.instances_hash({ Name: options['name'] }, false)
       results.each do |instance|
-        @core.create_image_with_instance(instance)
+        begin
+          @core.create_image_with_instance(instance)
+        rescue => e
+          puts "\n#{e.message}\n#{e.backtrace.join("\n")}"
+        end
       end
     end
 
