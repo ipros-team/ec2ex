@@ -106,6 +106,9 @@ module Ec2ex
       unless instance.iam_instance_profile.nil?
         snapshot['iam_instance_profile'] = instance.iam_instance_profile.arn.split('/').last
       end
+      unless instance.key_name.nil?
+        snapshot['key_name'] = instance.key_name
+      end
 
       image_response = @ec2.create_image(
         instance_id: instance.instance_id,

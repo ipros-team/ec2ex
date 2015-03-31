@@ -164,10 +164,15 @@ module Ec2ex
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'name tag'
     option :renew, aliases: '-r', type: :boolean, default: false, desc: 'renew instance'
     option :persistent, type: :boolean, default: false, desc: 'persistent request'
+    option :stop, type: :boolean, default: false, desc: 'stop'
     def spot
       results = @core.instances_hash({ Name: options['name'] }, true)
       results.each do |instance|
+        if options['stop']
+          @core.stop_instance(instance.instance_id)
+        end
         image_id = @core.create_image_with_instance(instance)
+
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         option = {
           instance_count: 1,
@@ -183,6 +188,10 @@ module Ec2ex
 
         unless instance.iam_instance_profile.nil?
           option[:launch_specification][:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
+        end
+
+        unless instance.key_name.nil?
+          option[:launch_specification][:key_name] = instance.key_name
         end
 
         option[:launch_specification].merge!(eval(options['params']))
@@ -249,6 +258,10 @@ module Ec2ex
 
       if tag_hash.iam_instance_profile
         option[:launch_specification][:iam_instance_profile] = { name: tag_hash.iam_instance_profile }
+      end
+
+      if tag_hash.key_name
+        option[:launch_specification][:key_name] = tag_hash.key_name
       end
 
       network_interface = {
