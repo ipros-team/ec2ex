@@ -446,6 +446,16 @@ module Ec2ex
       end
     end
 
+    desc 'disconnect elb', 'disconnect elb'
+    option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
+    option :load_balancer_name, aliases: '-l', type: :string, default: '', required: true, desc: 'name tag'
+    def disconnect_elb
+      @core.instances_hash({ Name: options['name'] }, true).each do |instance|
+        option = { load_balancer_name: options['load_balancer_name'], instances: [instance_id: instance.instance_id] }
+        @elb.deregister_instances_from_load_balancer(option)
+      end
+    end
+
     desc 'elbs', 'show elbs'
     def elbs
       puts_json @elb.describe_load_balancers.data.to_h[:load_balancer_descriptions]
