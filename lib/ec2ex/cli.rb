@@ -381,7 +381,7 @@ module Ec2ex
     option :key, aliases: '-k', type: :array, required: true, desc: 'grouping key'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
     def aggregate
-      list = @core.instances_hash(options['condition'], options['running_only']).map do |_instance|
+      list = @core.instances_hash(options['condition'], options['running_only']).map do |instance|
         options['key'].map do |key|
           eval("instance.#{key} ")
         end.join('_')
