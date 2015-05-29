@@ -135,6 +135,10 @@ module Ec2ex
         if spot_instance_request.state == 'active'
           instance_id = spot_instance_request.instance_id
           break
+        elsif spot_instance_request.state == 'failed'
+          puts spot_instance_request.fault.code
+          @ec2.cancel_spot_instance_requests({ spot_instance_request_ids: [spot_instance_request_id] })
+          raise spot_instance_request.fault.message
         end
         sleep 10
       end
