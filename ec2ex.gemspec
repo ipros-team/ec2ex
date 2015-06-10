@@ -20,7 +20,7 @@ Gem::Specification.new do |gem|
   gem.add_dependency 'thor'
   gem.add_dependency 'hashie'
   gem.add_dependency 'ipaddress'
-  gem.add_dependency 'aws-sdk', '~> 2.0.11.pre'
+  gem.add_dependency 'aws-sdk'
   gem.add_dependency 'activesupport'
 
   gem.add_development_dependency 'bundler', '~> 1.7.2'

@@ -80,14 +80,6 @@ module Ec2ex
       ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }
     end
 
-    def images(name)
-      filter = [{ name: 'is-public', values: ['false'] }]
-      filter << { name: 'name', values: ["#{name}"] }
-      @ec2.describe_images(
-        filters: filter
-      ).data.to_h[:images]
-    end
-
     def create_image_with_instance(instance)
       tags = get_tag_hash(instance.tags)
       puts "#{tags['Name']} image creating..."
@@ -193,16 +185,38 @@ module Ec2ex
     end
 
     def latest_image_with_name(name)
-      filter = [{ name: 'is-public', values: ['false'] }]
-      filter << { name: 'tag:Name', values: [name] }
-      result = @ec2.describe_images(
-        filters: filter
-      ).data.to_h[:images]
+      result = search_image_with_name(name)
       result = result.sort_by{ |image|
         tag_hash = get_tag_hash(image[:tags])
         tag_hash['created'].nil? ? '' : tag_hash['created']
       }
       result.empty? ? {} : result.last
+    end
+
+    def get_old_images(name, num = 10)
+      result = search_image_with_name(name)
+      return [] if result.empty?
+      result = result.sort_by{ |image|
+        tag_hash = get_tag_hash(image[:tags])
+        tag_hash['created'].nil? ? '' : tag_hash['created']
+      }
+      result.reverse.slice(num, result.size)
+    end
+
+    def images(name)
+      filter = [{ name: 'is-public', values: ['false'] }]
+      filter << { name: 'name', values: [name] }
+      @ec2.describe_images(
+        filters: filter
+      ).data.to_h[:images]
+    end
+
+    def search_image_with_name(name)
+      filter = [{ name: 'is-public', values: ['false'] }]
+      filter << { name: 'tag:Name', values: [name] }
+      @ec2.describe_images(
+        filters: filter
+      ).data.to_h[:images]
     end
   end
 end

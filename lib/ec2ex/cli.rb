@@ -77,6 +77,25 @@ module Ec2ex
       end
     end
 
+    desc 'deregister_image', 'deregister image'
+    option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
+    option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'name tag'
+    def deregister_image
+      @core.get_old_images(options['name'], options['older_than']).each do |image|
+        image_id = image[:image_id]
+        puts "delete AMI #{image_id}"
+        @ec2.deregister_image({image_id: image_id})
+        snapshot_ids = image[:block_device_mappings]
+            .select{ |block_device_mapping| block_device_mapping[:ebs] != nil }
+            .map{ |block_device_mapping| block_device_mapping[:ebs][:snapshot_id] }
+
+        snapshot_ids.each do |snapshot_id|
+          puts "delete snapshot #{snapshot_id}"
+          @ec2.delete_snapshot({snapshot_id: snapshot_id})
+        end
+      end
+    end
+
     desc 'copy', 'copy instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
