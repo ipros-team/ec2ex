@@ -79,7 +79,7 @@ module Ec2ex
 
     desc 'deregister_image', 'deregister image'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
-    option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'name tag'
+    option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than day. default 30 days.'
     def deregister_image
       @core.get_old_images(options['name'], options['older_than']).each do |image|
         image_id = image[:image_id]

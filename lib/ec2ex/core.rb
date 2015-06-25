@@ -214,11 +214,15 @@ module Ec2ex
     def get_old_images(name, num = 10)
       result = search_image_with_name(name)
       return [] if result.empty?
-      result = result.sort_by{ |image|
+      result = result.select{ |image|
         tag_hash = get_tag_hash(image[:tags])
-        tag_hash['created'].nil? ? '' : tag_hash['created']
+        begin
+          Time.parse(tag_hash['created']) < (Time.now - (num * 24 * 60 * 60))
+        rescue => e
+          false
+        end
       }
-      result.reverse.slice(num, result.size)
+      result
     end
 
     def images(name)
