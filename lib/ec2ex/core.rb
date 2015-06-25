@@ -80,6 +80,12 @@ module Ec2ex
       ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }
     end
 
+    def instances_hash_with_id(instance_id)
+      @ec2.describe_instances(
+        instance_ids: [instance_id]
+      ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }.first
+    end
+
     def create_image_with_instance(instance)
       tags = get_tag_hash(instance.tags)
       puts "#{tags['Name']} image creating..."
@@ -139,6 +145,17 @@ module Ec2ex
       instance_id
     end
 
+    def set_delete_on_termination(instance)
+      block_device_mappings = instance.block_device_mappings.map{ |block_device_mapping|
+        ebs = block_device_mapping.ebs
+        {
+          device_name: block_device_mapping.device_name,
+          ebs: { volume_id: block_device_mapping.ebs.volume_id, delete_on_termination: true }
+        }
+      }
+      @ec2.modify_instance_attribute({instance_id: instance.instance_id, block_device_mappings: block_device_mappings})
+    end
+
     def get_allocation(public_ip_address)
       @ec2.describe_addresses(public_ips: [public_ip_address]).addresses.first
     end
@@ -170,7 +187,8 @@ module Ec2ex
       puts "start instance complete! instance_id => [#{instance_id}]"
     end
 
-    def terminate_instance(instance_id)
+    def terminate_instance(instance)
+      instance_id = instance.instance_id
       puts 'terminating...'
       @ec2.terminate_instances(instance_ids: [instance_id])
       @ec2.wait_until(:instance_terminated, instance_ids: [instance_id])

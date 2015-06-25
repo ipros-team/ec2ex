@@ -147,7 +147,7 @@ module Ec2ex
 
         image_id = @core.create_image_with_instance(instance)
 
-        @core.terminate_instance(instance.instance_id)
+        @core.terminate_instance(instance)
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         request = {
           image_id: image_id,
@@ -233,12 +233,13 @@ module Ec2ex
           option[:launch_specification].delete(:security_group_ids)
           option[:launch_specification].delete(:subnet_id)
         end
-        @core.terminate_instance(instance.instance_id) if options['renew']
+        @core.terminate_instance(instance) if options['renew']
 
         response = @ec2.request_spot_instances(option)
         spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
         sleep 5
         instance_id = @core.wait_spot_running(spot_instance_request_id)
+        @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
 
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
@@ -296,6 +297,7 @@ module Ec2ex
       spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
       sleep 5
       instance_id = @core.wait_spot_running(spot_instance_request_id)
+      @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
       @ec2.create_tags(resources: [instance_id], tags: JSON.parse(tag_hash[:tags]))
 
       if tag_hash.public_ip_address
@@ -389,6 +391,15 @@ module Ec2ex
       @ec2.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
     end
 
+    desc 'reboot', 'reboot instance'
+    option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
+    def set_delete_on_termination
+      @core.instances_hash({ Name: options['name'] }, true).each do |instance|
+        @core.set_delete_on_termination(instance)
+        puts "set delete on termination => #{instance.instance_id}"
+      end
+    end
+
     desc 'search_images', 'search images'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     def search_images(name = options['name'])
@@ -436,7 +447,7 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def terminate
       @core.instances_hash({ Name: options['name'] }, false).each do |instance|
-        @core.terminate_instance(instance.instance_id)
+        @core.terminate_instance(instance)
       end
     end
 
