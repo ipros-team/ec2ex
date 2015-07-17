@@ -96,6 +96,12 @@ module Ec2ex
       end
     end
 
+    desc 'deregister_snapshot_no_related', 'AMI not related snapshot basis delete all'
+    option :owner_id, type: :string, required: true, desc: 'owner_id'
+    def deregister_snapshot_no_related
+      @core.deregister_snapshot_no_related(options['owner_id'])
+    end
+
     desc 'copy', 'copy instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'

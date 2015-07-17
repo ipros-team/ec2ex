@@ -240,5 +240,26 @@ module Ec2ex
         filters: filter
       ).data.to_h[:images]
     end
+
+    def deregister_snapshot_no_related(owner_id)
+      enable_snapshot_ids = []
+      images('*').each do |image|
+        image_id = image[:image_id]
+        snapshot_ids = image[:block_device_mappings]
+          .select{ |block_device_mapping| block_device_mapping[:ebs] != nil }
+          .map{ |block_device_mapping| block_device_mapping[:ebs][:snapshot_id] }
+        enable_snapshot_ids.concat(snapshot_ids)
+      end
+      filter = [{ name: 'owner-id', values: [owner_id] }]
+      all_snapshot_ids = @ec2.describe_snapshots(
+        filters: filter
+      ).data.to_h[:snapshots].map{ |snapshot| snapshot[:snapshot_id] }
+      disable_snapshot_ids = (all_snapshot_ids - enable_snapshot_ids)
+      disable_snapshot_ids.each do |disable_snapshot_id|
+        @ec2.delete_snapshot({snapshot_id: disable_snapshot_id})
+        puts "delete snapshot #{disable_snapshot_id}"
+      end
+    end
+
   end
 end
