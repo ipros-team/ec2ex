@@ -2,6 +2,7 @@ require 'thor'
 require 'json'
 require 'pp'
 require 'hashie'
+require 'parallel'
 require 'active_support/core_ext/hash'
 
 module Ec2ex
@@ -65,10 +66,11 @@ module Ec2ex
     end
 
     desc 'create_image', 'create image'
-    option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
+    option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
+    option :proc, type: :numeric, default: Parallel.processor_count, desc: 'Number of parallel'
     def create_image
       results = @core.instances_hash({ Name: options['name'] }, false)
-      results.each do |instance|
+      Parallel.map(results, in_threads: options['proc']) do |instance|
         begin
           @core.create_image_with_instance(instance)
         rescue => e

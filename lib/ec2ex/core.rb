@@ -118,7 +118,7 @@ module Ec2ex
         w.interval = 15
         w.max_attempts = 720
       end
-      puts "image create complete! image_id => [#{image_response.image_id}]"
+      puts "image create complete #{tags['Name']}! image_id => [#{image_response.image_id}]"
 
       ami_tag = format_tag(snapshot)
       @ec2.create_tags(resources: [image_response.image_id], tags: ami_tag)
