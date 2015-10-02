@@ -116,7 +116,7 @@ module Ec2ex
       sleep 10
       @ec2.wait_until(:image_available, image_ids: [image_response.image_id]) do |w|
         w.interval = 15
-        w.max_attempts = 720
+        w.max_attempts = 1440
       end
       puts "image create complete #{tags['Name']}! image_id => [#{image_response.image_id}]"
 
