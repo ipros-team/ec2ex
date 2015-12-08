@@ -467,6 +467,14 @@ module Ec2ex
       end
     end
 
+    desc 'stop', 'stop instance'
+    option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
+    def stop
+      @core.instances_hash({ Name: options['name'] }, false).each do |instance|
+        @core.stop_instance(instance.instance_id)
+      end
+    end
+
     desc 'connect elb', 'connect elb'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :load_balancer_name, aliases: '-l', type: :string, default: '', required: true, desc: 'name tag'
