@@ -459,11 +459,19 @@ module Ec2ex
       end
     end
 
-    desc 'terminate', 'terminate instance'
+    desc 'start', 'start instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def start
       @core.instances_hash({ Name: options['name'] }, false).each do |instance|
         @core.start_instance(instance.instance_id)
+      end
+    end
+
+    desc 'stop', 'stop instance'
+    option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
+    def stop
+      @core.instances_hash({ Name: options['name'] }, false).each do |instance|
+        @core.stop_instance(instance.instance_id)
       end
     end
 
