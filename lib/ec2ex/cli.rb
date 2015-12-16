@@ -187,6 +187,7 @@ module Ec2ex
     option :price, type: :string, required: true, desc: 'price'
     option :private_ip_address, type: :string, default: nil, desc: 'private_ip_address'
     option :public_ip_address, type: :string, default: nil, desc: 'public_ip_address'
+    option :block_duration_minutes, type: :numeric, default: nil, desc: 'block_duration_minutes'
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'name tag'
     option :renew, aliases: '-r', type: :boolean, default: false, desc: 'renew instance'
@@ -212,6 +213,7 @@ module Ec2ex
           },
         }
         option[:type] = 'persistent' if options['persistent']
+        option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
 
         unless instance.iam_instance_profile.nil?
           option[:launch_specification][:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
@@ -271,6 +273,7 @@ module Ec2ex
     option :price, type: :string, required: true, desc: 'price'
     option :private_ip_address, type: :string, default: nil, desc: 'private_ip_address'
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
+    option :block_duration_minutes, type: :numeric, default: nil, desc: 'block_duration_minutes'
     def run_spot
       private_ip_address = options['private_ip_address']
       image = @core.latest_image_with_name(options['name'])
@@ -283,6 +286,8 @@ module Ec2ex
           instance_type: tag_hash.instance_type
         },
       }
+
+      option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
 
       if tag_hash.iam_instance_profile
         option[:launch_specification][:iam_instance_profile] = { name: tag_hash.iam_instance_profile }
