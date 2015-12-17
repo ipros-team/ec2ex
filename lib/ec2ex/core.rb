@@ -1,6 +1,7 @@
 require 'aws-sdk'
 require 'ipaddress'
 require 'open-uri'
+require 'multimap'
 
 TIME_OUT = 3
 module Ec2ex
@@ -214,15 +215,22 @@ module Ec2ex
     def get_old_images(name, num = 10)
       result = search_image_with_name(name)
       return [] if result.empty?
-      result = result.select{ |image|
+      map = Multimap.new
+      result = result.each{ |image|
         tag_hash = get_tag_hash(image[:tags])
-        begin
-          Time.parse(tag_hash['created']) < (Time.now - (num * 24 * 60 * 60))
-        rescue => e
-          false
-        end
+        next if tag_hash['Name'].nil? || tag_hash['created'].nil?
+        map[tag_hash['Name']] = image
       }
-      result
+      old_images = []
+      map.each_association do |name, images|
+        sorted_images = images.sort_by{ |image|
+          tag_hash = get_tag_hash(image[:tags])
+          Time.parse(tag_hash['created'])
+        }
+        newly_images = sorted_images.last(num)
+        old_images = old_images + (sorted_images - newly_images)
+      end
+      old_images
     end
 
     def images(name)

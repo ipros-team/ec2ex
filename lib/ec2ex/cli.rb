@@ -81,7 +81,7 @@ module Ec2ex
 
     desc 'deregister_image', 'deregister image'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
-    option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than day. default 30 days.'
+    option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def deregister_image
       @core.get_old_images(options['name'], options['older_than']).each do |image|
         image_id = image[:image_id]
@@ -96,6 +96,13 @@ module Ec2ex
           @ec2.delete_snapshot({snapshot_id: snapshot_id})
         end
       end
+    end
+
+    desc 'deregister_image', 'deregister image'
+    option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
+    option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
+    def old_images
+      puts_json(@core.get_old_images(options['name'], options['older_than']))
     end
 
     desc 'deregister_snapshot_no_related', 'AMI not related snapshot basis delete all'
