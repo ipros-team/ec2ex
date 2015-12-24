@@ -133,6 +133,10 @@ module Ec2ex
         unless instance.iam_instance_profile.nil?
           request[:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
         end
+        if instance.key_name
+          request[:key_name] = instance.key_name
+        end
+
         request.merge!(eval(options['params']))
         request[:subnet_id] = @core.get_subnet(request[:private_ip_address]).subnet_id
 
