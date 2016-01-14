@@ -23,7 +23,6 @@ Gem::Specification.new do |gem|
   gem.add_dependency 'aws-sdk'
   gem.add_dependency 'activesupport'
   gem.add_dependency 'parallel'
-  gem.add_dependency 'multimap'
 
   gem.add_development_dependency 'bundler', '~> 1.7.2'
   gem.add_development_dependency 'pry', '~> 0.10.1'
