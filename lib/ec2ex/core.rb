@@ -1,6 +1,7 @@
 require 'aws-sdk'
 require 'ipaddress'
 require 'open-uri'
+require "logger"
 
 TIME_OUT = 3
 module Ec2ex
@@ -9,10 +10,15 @@ module Ec2ex
       ENV['AWS_REGION'] = ENV['AWS_REGION'] || get_metadata['region']
       @ec2 = Aws::EC2::Client.new
       @elb = Aws::ElasticLoadBalancing::Client.new
+      @logger = Logger.new(STDOUT);
     end
 
     def client
       @ec2
+    end
+
+    def logger
+      @logger
     end
 
     def get_metadata
@@ -88,7 +94,7 @@ module Ec2ex
 
     def create_image_with_instance(instance)
       tags = get_tag_hash(instance.tags)
-      puts "#{tags['Name']} image creating..."
+      @logger.info "#{tags['Name']} image creating..."
       snapshot = {
         'created' => Time.now.strftime('%Y%m%d%H%M%S'),
         'tags' => instance.tags.map(&:to_hash).to_json,
@@ -118,7 +124,7 @@ module Ec2ex
         w.interval = 15
         w.max_attempts = 1440
       end
-      puts "image create complete #{tags['Name']}! image_id => [#{image_response.image_id}]"
+      @logger.info "image create complete #{tags['Name']}! image_id => [#{image_response.image_id}]"
 
       ami_tag = format_tag(snapshot)
       @ec2.create_tags(resources: [image_response.image_id], tags: ami_tag)
@@ -126,7 +132,7 @@ module Ec2ex
     end
 
     def wait_spot_running(spot_instance_request_id)
-      puts 'spot instance creating...'
+      @logger.info 'spot instance creating...'
       instance_id = nil
       while true
         spot_instance_request = @ec2.describe_spot_instance_requests(spot_instance_request_ids: [spot_instance_request_id]).spot_instance_requests.first
@@ -134,14 +140,14 @@ module Ec2ex
           instance_id = spot_instance_request.instance_id
           break
         elsif spot_instance_request.state == 'failed'
-          puts spot_instance_request.fault.code
+          @logger.info spot_instance_request.fault.code
           @ec2.cancel_spot_instance_requests({ spot_instance_request_ids: [spot_instance_request_id] })
           raise spot_instance_request.fault.message
         end
         sleep 10
       end
       @ec2.wait_until(:instance_running, instance_ids: [instance_id])
-      puts "spot instance create complete! instance_id => [#{instance_id}]"
+      @logger.info "spot instance create complete! instance_id => [#{instance_id}]"
       instance_id
     end
 
@@ -169,30 +175,30 @@ module Ec2ex
     end
 
     def stop_instance(instance_id)
-      puts 'stopping...'
+      @logger.info 'stopping...'
       @ec2.stop_instances(
         instance_ids: [instance_id],
         force: true
       )
       @ec2.wait_until(:instance_stopped, instance_ids: [instance_id])
-      puts "stop instance complete! instance_id => [#{instance_id}]"
+      @logger.info "stop instance complete! instance_id => [#{instance_id}]"
     end
 
     def start_instance(instance_id)
-      puts 'starting...'
+      @logger.info 'starting...'
       @ec2.start_instances(
         instance_ids: [instance_id]
       )
       @ec2.wait_until(:instance_running, instance_ids: [instance_id])
-      puts "start instance complete! instance_id => [#{instance_id}]"
+      @logger.info "start instance complete! instance_id => [#{instance_id}]"
     end
 
     def terminate_instance(instance)
       instance_id = instance.instance_id
-      puts 'terminating...'
+      @logger.info 'terminating...'
       @ec2.terminate_instances(instance_ids: [instance_id])
       @ec2.wait_until(:instance_terminated, instance_ids: [instance_id])
-      puts "terminate instance complete! instance_id => [#{instance_id}]"
+      @logger.info "terminate instance complete! instance_id => [#{instance_id}]"
     end
 
     def associate_address(instance_id, public_ip_address)
@@ -264,7 +270,7 @@ module Ec2ex
       disable_snapshot_ids = (all_snapshot_ids - enable_snapshot_ids)
       disable_snapshot_ids.each do |disable_snapshot_id|
         @ec2.delete_snapshot({snapshot_id: disable_snapshot_id})
-        puts "delete snapshot #{disable_snapshot_id}"
+        @logger.info "delete snapshot #{disable_snapshot_id}"
       end
     end
 

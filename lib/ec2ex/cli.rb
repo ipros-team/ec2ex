@@ -21,6 +21,7 @@ module Ec2ex
       @core = Core.new
       @ec2 = @core.client
       @elb = @core.elb_client
+      @logger = @core.logger
     end
 
     desc 'search', 'search instance'
@@ -74,7 +75,7 @@ module Ec2ex
         begin
           @core.create_image_with_instance(instance)
         rescue => e
-          puts "\n#{e.message}\n#{e.backtrace.join("\n")}"
+          @logger.info "\n#{e.message}\n#{e.backtrace.join("\n")}"
         end
       end
     end
@@ -85,14 +86,14 @@ module Ec2ex
     def deregister_image
       @core.get_old_images(options['name'], options['older_than']).each do |image|
         image_id = image[:image_id]
-        puts "delete AMI #{image_id}"
+        @logger.info "delete AMI #{image_id}"
         @ec2.deregister_image({image_id: image_id})
         snapshot_ids = image[:block_device_mappings]
             .select{ |block_device_mapping| block_device_mapping[:ebs] != nil }
             .map{ |block_device_mapping| block_device_mapping[:ebs][:snapshot_id] }
 
         snapshot_ids.each do |snapshot_id|
-          puts "delete snapshot #{snapshot_id}"
+          @logger.info "delete snapshot #{snapshot_id}"
           @ec2.delete_snapshot({snapshot_id: snapshot_id})
         end
       end
@@ -420,7 +421,7 @@ module Ec2ex
     def set_delete_on_termination
       @core.instances_hash({ Name: options['name'] }, true).each do |instance|
         @core.set_delete_on_termination(instance)
-        puts "set delete on termination => #{instance.instance_id}"
+        @logger.info "set delete on termination => #{instance.instance_id}"
       end
     end
 
@@ -462,7 +463,7 @@ module Ec2ex
           @ec2.wait_until(:instance_stopped, instance_ids: [instance.instance_id])
           instance.start
           @ec2.wait_until(:instance_running, instance_ids: [instance.instance_id])
-          puts "#{instance.tags['Name']} restart complete!"
+          @logger.info "#{instance.tags['Name']} restart complete!"
         end
       end
     end
