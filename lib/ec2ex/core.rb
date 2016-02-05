@@ -274,5 +274,15 @@ module Ec2ex
       end
     end
 
+    def ping?(private_ip_address)
+      if private_ip_address
+        pinger = Net::Ping::External.new(private_ip_address)
+        if pinger.ping?
+          @logger.info "already exists private_ip_address => #{private_ip_address}"
+          return true
+        end
+      end
+      return false
+    end
   end
 end

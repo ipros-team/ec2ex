@@ -4,6 +4,7 @@ require 'pp'
 require 'hashie'
 require 'parallel'
 require 'active_support/core_ext/hash'
+require 'net/ping'
 
 module Ec2ex
   class CLI < Thor
@@ -178,8 +179,12 @@ module Ec2ex
           placement: instance.placement.to_hash,
           private_ip_address: instance.private_ip_address
         }
-        unless instance.iam_instance_profile.nil?
+        if instance.iam_instance_profile
           request[:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
+        end
+
+        if instance.key_name
+          request[:key_name] = instance.key_name
         end
         request.merge!(params)
         request[:subnet_id] = @core.get_subnet(request[:private_ip_address]).subnet_id
@@ -287,9 +292,12 @@ module Ec2ex
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     option :block_duration_minutes, type: :numeric, default: nil, desc: 'block_duration_minutes'
     def run_spot
-      private_ip_address = options['private_ip_address']
       image = @core.latest_image_with_name(options['name'])
+
       tag_hash = @core.get_tag_hash(image[:tags])
+      private_ip_address = options['private_ip_address'] || tag_hash.private_ip_address
+      exit 0 if @core.ping?(private_ip_address)
+
       option = {
         instance_count: 1,
         spot_price: options['price'],
@@ -311,9 +319,9 @@ module Ec2ex
 
       network_interface = {
         device_index: 0,
-        subnet_id: @core.get_subnet(private_ip_address || tag_hash.private_ip_address).subnet_id,
+        subnet_id: @core.get_subnet(private_ip_address).subnet_id,
         groups: JSON.parse(tag_hash.security_groups),
-        private_ip_addresses: [{ private_ip_address: private_ip_address || tag_hash.private_ip_address, primary: true }]
+        private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
       }
       option[:launch_specification][:network_interfaces] = [network_interface]
       option[:launch_specification].merge!(eval(options['params']))
