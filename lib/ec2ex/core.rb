@@ -284,5 +284,9 @@ module Ec2ex
       end
       return false
     end
+
+    def allocate_address_vpc
+      @ec2.allocate_address(domain: 'vpc').data
+    end
   end
 end

@@ -281,7 +281,10 @@ module Ec2ex
       end
 
       public_ip_address = nil
-      if options['public_ip_address'].nil?
+      if options['public_ip_address'] == 'auto'
+        allocate_address_result = @core.allocate_address_vpc
+        public_ip_address = allocate_address_result.public_ip
+      elsif options['public_ip_address'].nil?
         public_ip_address = instance.public_ip_address if options['renew']
       else
         public_ip_address = options['public_ip_address']
@@ -561,9 +564,9 @@ module Ec2ex
     end
 
     desc 'allocate_address', 'allocate address'
-    def allocate_address
-      response = @ec2.allocate_address(domain: 'vpc')
-      puts response
+    def allocate_address_vpc
+      response = @core.allocate_address_vpc
+      puts response.data
     end
 
     private
