@@ -86,6 +86,16 @@ module Ec2ex
       ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }
     end
 
+    def instances_hash_first_result(condition, running_only = true)
+      results = instances_hash(condition, running_only)
+      instance = results.first
+      unless instance
+        @logger.warn("not match instance => #{condition}")
+        exit 1
+      end
+      instance
+    end
+
     def instances_hash_with_id(instance_id)
       @ec2.describe_instances(
         instance_ids: [instance_id]

@@ -117,39 +117,44 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'name tag'
+    option :private_ip_address, type: :string, default: nil, desc: 'private_ip_address'
+    option :public_ip_address, type: :string, default: nil, desc: 'public_ip_address'
     def copy
-      results = @core.instances_hash({ Name: options['name'] }, true)
-      results.each do |instance|
-        image_id = @core.create_image_with_instance(instance)
-        security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
-        request = {
-          image_id: image_id,
-          min_count: 1,
-          max_count: 1,
-          security_group_ids: security_group_ids,
-          instance_type: instance.instance_type,
-          placement: instance.placement.to_hash,
-          subnet_id: instance.subnet_id,
-          private_ip_address: instance.private_ip_address
-        }
-        unless instance.iam_instance_profile.nil?
-          request[:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
-        end
-        if instance.key_name
-          request[:key_name] = instance.key_name
-        end
-
-        request.merge!(eval(options['params']))
-        request[:subnet_id] = @core.get_subnet(request[:private_ip_address]).subnet_id
-
-        response = @ec2.run_instances(request)
-        instance_id = response.instances.first.instance_id
-        @ec2.wait_until(:instance_running, instance_ids: [instance_id])
-        @ec2.create_tags(resources: [instance_id], tags: instance.tags)
-        unless options['tag'].nil?
-          @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
-        end
+      instance = @core.instances_hash_first_result({ Name: options['name'] }, true)
+      image_id = @core.create_image_with_instance(instance)
+      security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
+      request = {
+        image_id: image_id,
+        min_count: 1,
+        max_count: 1,
+        security_group_ids: security_group_ids,
+        instance_type: instance.instance_type,
+        placement: instance.placement.to_hash
+      }
+      request[:private_ip_address] = options['private_ip_address'] if options['private_ip_address']
+      unless instance.iam_instance_profile.nil?
+        request[:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
       end
+      if instance.key_name
+        request[:key_name] = instance.key_name
+      end
+
+      request.merge!(eval(options['params']))
+      request[:subnet_id] = if request[:private_ip_address]
+        @core.get_subnet(request[:private_ip_address]).subnet_id
+      else
+        instance.subnet_id
+      end
+
+      response = @ec2.run_instances(request)
+      instance_id = response.instances.first.instance_id
+      @ec2.wait_until(:instance_running, instance_ids: [instance_id])
+      @ec2.create_tags(resources: [instance_id], tags: instance.tags)
+      unless options['tag'].nil?
+        @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
+      end
+      public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, false)
+      @core.associate_address(instance_id, public_ip_address)
     end
 
     desc 'renew', 'renew instance'
@@ -211,13 +216,7 @@ module Ec2ex
     option :persistent, type: :boolean, default: false, desc: 'persistent request'
     option :stop, type: :boolean, default: false, desc: 'stop'
     def spot
-      results = @core.instances_hash({ Name: options['name'] }, true)
-      instance = results.first
-      unless instance
-        @logger.warn("not match instance => #{options['name']}")
-        exit
-      end
-
+      instance = @core.instances_hash_first_result({ Name: options['name'] }, true)
       if options['stop']
         @core.stop_instance(instance.instance_id)
       end
@@ -280,15 +279,7 @@ module Ec2ex
         @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
       end
 
-      public_ip_address = nil
-      if options['public_ip_address'] == 'auto'
-        allocate_address_result = @core.allocate_address_vpc
-        public_ip_address = allocate_address_result.public_ip
-      elsif options['public_ip_address'].nil?
-        public_ip_address = instance.public_ip_address if options['renew']
-      else
-        public_ip_address = options['public_ip_address']
-      end
+      public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, options['renew'])
       @core.associate_address(instance_id, public_ip_address)
     end
 
@@ -579,6 +570,19 @@ module Ec2ex
         data = @core.extract_fields(data, @global_options['fields'])
       end
       puts JSON.pretty_generate(data)
+    end
+
+    def get_public_ip_address(define_public_ip_address, instance_public_ip_address, renew)
+      public_ip_address = nil
+      if define_public_ip_address == 'auto'
+        allocate_address_result = @core.allocate_address_vpc
+        public_ip_address = allocate_address_result.public_ip
+      elsif define_public_ip_address.nil?
+        public_ip_address = instance_public_ip_address if renew
+      else
+        public_ip_address = define_public_ip_address
+      end
+      public_ip_address
     end
   end
 end
