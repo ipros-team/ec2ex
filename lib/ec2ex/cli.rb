@@ -212,77 +212,81 @@ module Ec2ex
     option :stop, type: :boolean, default: false, desc: 'stop'
     def spot
       results = @core.instances_hash({ Name: options['name'] }, true)
-      results.each do |instance|
-        if options['stop']
-          @core.stop_instance(instance.instance_id)
-        end
-        image_id = @core.create_image_with_instance(instance)
-
-        security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
-        option = {
-          instance_count: 1,
-          spot_price: options['price'],
-          launch_specification: {
-            image_id: image_id,
-            instance_type: instance.instance_type,
-            security_group_ids: security_group_ids,
-            subnet_id: instance.subnet_id
-          },
-        }
-        option[:type] = 'persistent' if options['persistent']
-        option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
-
-        unless instance.iam_instance_profile.nil?
-          option[:launch_specification][:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
-        end
-
-        unless instance.key_name.nil?
-          option[:launch_specification][:key_name] = instance.key_name
-        end
-
-        option[:launch_specification].merge!(eval(options['params']))
-
-        private_ip_address = nil
-        if options['private_ip_address'].nil?
-          private_ip_address = instance.private_ip_address if options['renew']
-        else
-          private_ip_address = options['private_ip_address']
-        end
-
-        unless private_ip_address.nil?
-          network_interface = {
-            device_index: 0,
-            subnet_id: @core.get_subnet(private_ip_address).subnet_id,
-            groups: option[:launch_specification][:security_group_ids],
-            private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
-          }
-          option[:launch_specification][:network_interfaces] = [network_interface]
-          option[:launch_specification].delete(:security_group_ids)
-          option[:launch_specification].delete(:subnet_id)
-        end
-        @core.terminate_instance(instance) if options['renew']
-
-        response = @ec2.request_spot_instances(option)
-        spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
-        sleep 5
-        instance_id = @core.wait_spot_running(spot_instance_request_id)
-        @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
-
-        @ec2.create_tags(resources: [instance_id], tags: instance.tags)
-        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
-
-        unless options['tag'].empty?
-          @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
-        end
-
-        public_ip_address = nil
-        if options['public_ip_address'].nil?
-          public_ip_address = instance.public_ip_address if options['renew']
-        else
-          public_ip_address = options['public_ip_address']
-        end
-        @core.associate_address(instance_id, public_ip_address)
+      instance = results.first
+      unless instance
+        @logger.warn("not match instance => #{options['name']}")
+        exit
       end
+
+      if options['stop']
+        @core.stop_instance(instance.instance_id)
+      end
+      image_id = @core.create_image_with_instance(instance)
+
+      security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
+      option = {
+        instance_count: 1,
+        spot_price: options['price'],
+        launch_specification: {
+          image_id: image_id,
+          instance_type: instance.instance_type,
+          security_group_ids: security_group_ids,
+          subnet_id: instance.subnet_id
+        },
+      }
+      option[:type] = 'persistent' if options['persistent']
+      option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
+
+      unless instance.iam_instance_profile.nil?
+        option[:launch_specification][:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
+      end
+
+      unless instance.key_name.nil?
+        option[:launch_specification][:key_name] = instance.key_name
+      end
+
+      option[:launch_specification].merge!(eval(options['params']))
+
+      private_ip_address = nil
+      if options['private_ip_address'].nil?
+        private_ip_address = instance.private_ip_address if options['renew']
+      else
+        private_ip_address = options['private_ip_address']
+      end
+
+      unless private_ip_address.nil?
+        network_interface = {
+          device_index: 0,
+          subnet_id: @core.get_subnet(private_ip_address).subnet_id,
+          groups: option[:launch_specification][:security_group_ids],
+          private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
+        }
+        option[:launch_specification][:network_interfaces] = [network_interface]
+        option[:launch_specification].delete(:security_group_ids)
+        option[:launch_specification].delete(:subnet_id)
+      end
+      @core.terminate_instance(instance) if options['renew']
+
+      response = @ec2.request_spot_instances(option)
+      spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
+      sleep 5
+      instance_id = @core.wait_spot_running(spot_instance_request_id)
+      @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
+
+      @ec2.create_tags(resources: [instance_id], tags: instance.tags)
+      @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
+
+      unless options['tag'].empty?
+        @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
+      end
+
+      public_ip_address = nil
+      if options['public_ip_address'].nil?
+        public_ip_address = instance.public_ip_address if options['renew']
+      else
+        public_ip_address = options['public_ip_address']
+      end
+      @core.associate_address(instance_id, public_ip_address)
     end
 
     desc 'run_spot', 'run_spot latest image'
