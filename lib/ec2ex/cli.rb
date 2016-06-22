@@ -569,6 +569,13 @@ module Ec2ex
       puts response.data
     end
 
+    desc 'instance_metadata', 'instance metadata'
+    option :path, type: :string, required: true, desc: 'path'
+    def instance_metadata
+      response = @core.get_metadata(options['path'])
+      puts response
+    end
+
     private
     def instances(name, _running_only = true)
       @ec2.instances.with_tag('Name', "#{name}")

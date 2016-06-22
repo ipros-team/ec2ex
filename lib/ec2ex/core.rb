@@ -7,7 +7,7 @@ TIME_OUT = 3
 module Ec2ex
   class Core
     def initialize
-      ENV['AWS_REGION'] = ENV['AWS_REGION'] || get_metadata['region']
+      ENV['AWS_REGION'] = ENV['AWS_REGION'] || get_document['region']
       @ec2 = Aws::EC2::Client.new
       @elb = Aws::ElasticLoadBalancing::Client.new
       @logger = Logger.new(STDOUT);
@@ -21,12 +21,16 @@ module Ec2ex
       @logger
     end
 
-    def get_metadata
+    def get_document
+      JSON.parse(get_metadata('/latest/dynamic/instance-identity/document/'))
+    end
+
+    def get_metadata(path)
       begin
         result = {}
         timeout(TIME_OUT) {
-          body = open('http://169.254.169.254/latest/dynamic/instance-identity/document/').read
-          result = JSON.parse(body)
+          body = open('http://169.254.169.254' + path).read
+          return body
         }
         return result
       rescue TimeoutError => e
