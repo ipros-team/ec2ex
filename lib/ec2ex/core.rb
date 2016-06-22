@@ -108,6 +108,10 @@ module Ec2ex
       ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }.first
     end
 
+    def own_tag
+      get_tag_hash(instances_hash_with_id(get_metadata('/latest/meta-data/instance-id')).tags)
+    end
+
     def create_image_with_instance(instance)
       tags = get_tag_hash(instance.tags)
       @logger.info "#{tags['Name']} image creating..."

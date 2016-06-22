@@ -574,6 +574,17 @@ module Ec2ex
       puts response
     end
 
+    desc 'own_tag', 'own tag'
+    option :key, type: :string, desc: 'key'
+    def own_tag
+      response = @core.own_tag
+      if options['key']
+        puts response[options['key']]
+      else
+        puts_json response
+      end
+    end
+
     private
     def instances(name, _running_only = true)
       @ec2.instances.with_tag('Name', "#{name}")
