@@ -2,6 +2,8 @@ require 'aws-sdk'
 require 'ipaddress'
 require 'open-uri'
 require "logger"
+require 'hashie'
+require 'net/ping'
 
 TIME_OUT = 3
 module Ec2ex

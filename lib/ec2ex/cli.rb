@@ -1,10 +1,8 @@
 require 'thor'
 require 'json'
 require 'pp'
-require 'hashie'
 require 'parallel'
 require 'active_support/core_ext/hash'
-require 'net/ping'
 
 module Ec2ex
   class CLI < Thor
