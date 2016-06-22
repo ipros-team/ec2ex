@@ -134,7 +134,7 @@ module Ec2ex
           placement: instance.placement.to_hash
         }
         request[:private_ip_address] = options['private_ip_address'] if options['private_ip_address']
-        unless instance.iam_instance_profile.nil?
+        if instance.iam_instance_profile
           request[:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
         end
         if instance.key_name
@@ -243,11 +243,11 @@ module Ec2ex
         option[:type] = 'persistent' if options['persistent']
         option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
 
-        unless instance.iam_instance_profile.nil?
+        if instance.iam_instance_profile
           option[:launch_specification][:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
         end
 
-        unless instance.key_name.nil?
+        if instance.key_name
           option[:launch_specification][:key_name] = instance.key_name
         end
 
@@ -260,7 +260,7 @@ module Ec2ex
           private_ip_address = options['private_ip_address']
         end
 
-        unless private_ip_address.nil?
+        if private_ip_address
           network_interface = {
             device_index: 0,
             subnet_id: @core.get_subnet(private_ip_address).subnet_id,
