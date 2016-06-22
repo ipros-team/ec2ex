@@ -28,7 +28,7 @@ module Ec2ex
     def get_metadata(path)
       begin
         result = {}
-        timeout(TIME_OUT) {
+        ::Timeout.timeout(TIME_OUT) {
           body = open('http://169.254.169.254' + path).read
           return body
         }
