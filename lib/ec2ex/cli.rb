@@ -121,7 +121,7 @@ module Ec2ex
     def copy
       instance = @core.instances_hash_first_result({ Name: options['name'] }, true)
       image_id = @core.create_image_with_instance(instance)
-      options['instance_count'].times{ |server_index|
+      Parallel.map(options['instance_count'].times.to_a, in_threads: Parallel.processor_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         request = {
           image_id: image_id,
@@ -157,7 +157,7 @@ module Ec2ex
         public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, false)
         @core.associate_address(instance_id, public_ip_address)
         @logger.info("created instance => #{instance_id}")
-      }
+      end
     end
 
     desc 'renew', 'renew instance'
@@ -226,7 +226,7 @@ module Ec2ex
       end
       image_id = @core.create_image_with_instance(instance)
 
-      options['instance_count'].times{ |server_index|
+      Parallel.map(options['instance_count'].times.to_a, in_threads: Parallel.processor_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         option = {
           instance_count: 1,
@@ -287,7 +287,7 @@ module Ec2ex
 
         public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, options['renew'])
         @core.associate_address(instance_id, public_ip_address)
-      }
+      end
     end
 
     desc 'run_spot', 'run_spot latest image'
@@ -484,7 +484,8 @@ module Ec2ex
     desc 'terminate', 'terminate instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def terminate
-      @core.instances_hash({ Name: options['name'] }, false).each do |instance|
+      instances = @core.instances_hash({ Name: options['name'] }, false)
+      Parallel.map(instances, in_threads: Parallel.processor_count) do |instance|
         @core.terminate_instance(instance)
       end
     end
