@@ -152,7 +152,13 @@ module Ec2ex
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
         unless options['tag'].nil?
-          @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
+          @ec2.create_tags(
+            resources: [instance_id],
+            tags: @core.format_tag(
+              options['tag'],
+              @core.get_tag_hash_from_id(instance_id)
+            )
+          )
         end
         public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, false)
         @core.associate_address(instance_id, public_ip_address)
@@ -282,7 +288,13 @@ module Ec2ex
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
 
         unless options['tag'].empty?
-          @ec2.create_tags(resources: [instance_id], tags: @core.format_tag(options['tag']))
+          @ec2.create_tags(
+            resources: [instance_id],
+            tags: @core.format_tag(
+              options['tag'],
+              @core.get_tag_hash_from_id(instance_id)
+            )
+          )
         end
 
         public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, options['renew'])

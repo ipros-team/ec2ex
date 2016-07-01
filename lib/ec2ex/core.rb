@@ -61,10 +61,11 @@ module Ec2ex
       Hash[list.group_by { |e| e }.map { |k, v| [k, v.length] }]
     end
 
-    def format_tag(tag)
+    def format_tag(tag, preset_tag_hash = {})
       tags = []
       tag.each do |k, v|
-        tags << { key: k, value: v || '' }
+        value = v ? ERB.new(v.gsub(/\$\{([^}]+)\}/, "<%=preset_tag_hash['" + '\1' + "'] %>")).result(binding) : ''
+        tags << { key: k, value: value }
       end
       tags
     end
@@ -75,6 +76,14 @@ module Ec2ex
         result[hash['key'] || hash[:key]] = hash['value'] || hash[:value]
       }
       Hashie::Mash.new(result)
+    end
+
+    def get_tag_hash_from_id(instance_id)
+      preset_tag = {}
+      @ec2.describe_tags(filters: [{ name: 'resource-id', values: [instance_id] }]).tags.each do |tag|
+        preset_tag[tag.key] = tag.value
+      end
+      preset_tag
     end
 
     def instances_hash(condition, running_only = true)
