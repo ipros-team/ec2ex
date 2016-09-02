@@ -169,7 +169,7 @@ module Ec2ex
     desc 'renew', 'renew instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :stop, type: :boolean, default: true, desc: 'stop'
-    option :params, aliases: '-p', type: :string, default: nil, desc: 'params'
+    option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     def renew
       params = eval(options['params'])
       results = @core.instances_hash({ Name: options['name'] }, false)
