@@ -86,7 +86,7 @@ module Ec2ex
     def deregister_image
       @core.get_old_images(options['name'], options['older_than']).each do |image|
         image_id = image[:image_id]
-        @logger.info "delete AMI #{image_id}"
+        @logger.info "delete AMI #{image_id} [#{image[:name]}]"
         @ec2.deregister_image({image_id: image_id})
         snapshot_ids = image[:block_device_mappings]
             .select{ |block_device_mapping| block_device_mapping[:ebs] != nil }
