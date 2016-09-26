@@ -442,7 +442,7 @@ module Ec2ex
       @ec2.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
     end
 
-    desc 'reboot', 'reboot instance'
+    desc 'set_delete_on_termination', 'set delete on termination instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def set_delete_on_termination
       @core.instances_hash({ Name: options['name'] }, true).each do |instance|
