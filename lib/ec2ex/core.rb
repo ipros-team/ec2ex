@@ -121,31 +121,36 @@ module Ec2ex
       get_tag_hash(instances_hash_with_id(get_metadata('/latest/meta-data/instance-id')).tags)
     end
 
-    def create_image_with_instance(instance)
-      tags = get_tag_hash(instance.tags)
-      @logger.info "#{tags['Name']} image creating..."
-      snapshot = {
+    def get_ami_tag_hash(instance, tags)
+      ami_tag_hash = {
         'created' => Time.now.strftime('%Y%m%d%H%M%S'),
         'tags' => instance.tags.map(&:to_hash).to_json,
         'Name' => tags['Name']
       }
-      snapshot['security_groups'] = instance.security_groups.map(&:group_id).to_json
-      snapshot['private_ip_address'] = instance.private_ip_address
+      ami_tag_hash['security_groups'] = instance.security_groups.map(&:group_id).to_json
+      ami_tag_hash['private_ip_address'] = instance.private_ip_address
       unless instance.public_ip_address.nil?
-        snapshot['public_ip_address'] = instance.public_ip_address
+        ami_tag_hash['public_ip_address'] = instance.public_ip_address
       end
-      snapshot['instance_type'] = instance.instance_type
-      snapshot['placement'] = instance.placement.to_hash.to_json
+      ami_tag_hash['instance_type'] = instance.instance_type
+      ami_tag_hash['placement'] = instance.placement.to_hash.to_json
       unless instance.iam_instance_profile.nil?
-        snapshot['iam_instance_profile'] = instance.iam_instance_profile.arn.split('/').last
+        ami_tag_hash['iam_instance_profile'] = instance.iam_instance_profile.arn.split('/').last
       end
       unless instance.key_name.nil?
-        snapshot['key_name'] = instance.key_name
+        ami_tag_hash['key_name'] = instance.key_name
       end
+      ami_tag_hash
+    end
 
+    def create_image_with_instance(instance, region = nil)
+      tags = get_tag_hash(instance.tags)
+      @logger.info "#{tags['Name']} image creating..."
+
+      image_name = tags['Name'] + ".#{Time.now.strftime('%Y%m%d%H%M%S')}"
       image_response = @ec2.create_image(
         instance_id: instance.instance_id,
-        name: tags['Name'] + ".#{Time.now.strftime('%Y%m%d%H%M%S')}",
+        name: image_name,
         no_reboot: true
       )
       sleep 10
@@ -155,8 +160,20 @@ module Ec2ex
       end
       @logger.info "image create complete #{tags['Name']}! image_id => [#{image_response.image_id}]"
 
-      ami_tag = format_tag(snapshot)
+      ami_tag = format_tag(get_ami_tag_hash(instance, tags))
       @ec2.create_tags(resources: [image_response.image_id], tags: ami_tag)
+
+      if region
+        @logger.info "copying another region... [#{ENV['AWS_REGION']}] => [#{region}]"
+        dest_ec2 = Aws::EC2::Client.new(region: region)
+        copy_image_response = dest_ec2.copy_image(
+          source_region: ENV['AWS_REGION'],
+          source_image_id: image_response.image_id,
+          name: image_name
+        )
+        dest_ec2.create_tags(resources: [copy_image_response.image_id], tags: ami_tag)
+      end
+
       image_response.image_id
     end
 

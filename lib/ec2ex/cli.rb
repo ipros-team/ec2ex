@@ -69,11 +69,12 @@ module Ec2ex
     desc 'create_image', 'create image'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :proc, type: :numeric, default: Parallel.processor_count, desc: 'Number of parallel'
+    option :region, aliases: '-r', type: :string, required: false, default: nil, desc: 'region'
     def create_image
       results = @core.instances_hash({ Name: options[:name] }, false)
       Parallel.map(results, in_threads: options[:proc]) do |instance|
         begin
-          @core.create_image_with_instance(instance)
+          @core.create_image_with_instance(instance, options[:region])
         rescue => e
           @logger.info "\n#{e.message}\n#{e.backtrace.join("\n")}"
         end
