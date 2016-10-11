@@ -27,8 +27,8 @@ module Ec2ex
     desc 'search', 'search instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
-    def search(name = options['name'])
-      results = @core.instances_hash({ Name: name }, options['running_only'])
+    def search(name = options[:name])
+      results = @core.instances_hash({ Name: name }, options[:running_only])
       puts_json results
     end
 
@@ -36,7 +36,7 @@ module Ec2ex
     option :condition, aliases: '-c', type: :hash, default: {}, desc: 'grouping key'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
     def search_by_tags
-      puts_json @core.instances_hash(options['condition'], options['running_only'])
+      puts_json @core.instances_hash(options[:condition], options[:running_only])
     end
 
     desc 'reserved', 'reserved instance'
@@ -70,8 +70,8 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :proc, type: :numeric, default: Parallel.processor_count, desc: 'Number of parallel'
     def create_image
-      results = @core.instances_hash({ Name: options['name'] }, false)
-      Parallel.map(results, in_threads: options['proc']) do |instance|
+      results = @core.instances_hash({ Name: options[:name] }, false)
+      Parallel.map(results, in_threads: options[:proc]) do |instance|
         begin
           @core.create_image_with_instance(instance)
         rescue => e
@@ -84,7 +84,7 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def deregister_image
-      @core.get_old_images(options['name'], options['older_than']).each do |image|
+      @core.get_old_images(options[:name], options[:older_than]).each do |image|
         image_id = image[:image_id]
         @logger.info "delete AMI #{image_id} [#{image[:name]}]"
         @ec2.deregister_image({image_id: image_id})
@@ -103,13 +103,13 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def old_images
-      puts_json(@core.get_old_images(options['name'], options['older_than']))
+      puts_json(@core.get_old_images(options[:name], options[:older_than]))
     end
 
     desc 'deregister_snapshot_no_related', 'AMI not related snapshot basis delete all'
     option :owner_id, type: :string, required: true, desc: 'owner_id'
     def deregister_snapshot_no_related
-      @core.deregister_snapshot_no_related(options['owner_id'])
+      @core.deregister_snapshot_no_related(options[:owner_id])
     end
 
     desc 'copy', 'copy instance'
@@ -120,9 +120,9 @@ module Ec2ex
     option :public_ip_address, type: :string, default: nil, desc: 'public_ip_address'
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     def copy
-      instance = @core.instances_hash_first_result({ Name: options['name'] }, true)
+      instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
       image_id = @core.create_image_with_instance(instance)
-      Parallel.map(options['instance_count'].times.to_a, in_threads: Parallel.processor_count) do |server_index|
+      Parallel.map(options[:instance_count].times.to_a, in_threads: Parallel.processor_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         request = {
           image_id: image_id,
@@ -132,7 +132,7 @@ module Ec2ex
           instance_type: instance.instance_type,
           placement: instance.placement.to_hash
         }
-        request[:private_ip_address] = options['private_ip_address'] if options['private_ip_address']
+        request[:private_ip_address] = options[:private_ip_address] if options[:private_ip_address]
         if instance.iam_instance_profile
           request[:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
         end
@@ -140,7 +140,7 @@ module Ec2ex
           request[:key_name] = instance.key_name
         end
 
-        request.merge!(eval(options['params']))
+        request.merge!(eval(options[:params]))
         request[:subnet_id] = if request[:private_ip_address]
           @core.get_subnet(request[:private_ip_address]).subnet_id
         else
@@ -152,16 +152,16 @@ module Ec2ex
         @ec2.wait_until(:instance_running, instance_ids: [instance_id])
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
-        unless options['tag'].nil?
+        unless options[:tag].nil?
           @ec2.create_tags(
             resources: [instance_id],
             tags: @core.format_tag(
-              options['tag'],
+              options[:tag],
               @core.get_tag_hash_from_id(instance_id)
             )
           )
         end
-        public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, false)
+        public_ip_address = get_public_ip_address(options[:public_ip_address], instance.public_ip_address, false)
         @core.associate_address(instance_id, public_ip_address)
         @logger.info("created instance => #{instance_id}")
       end
@@ -172,12 +172,12 @@ module Ec2ex
     option :stop, type: :boolean, default: true, desc: 'stop'
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     def renew
-      params = eval(options['params'])
-      results = @core.instances_hash({ Name: options['name'] }, false)
+      params = eval(options[:params])
+      results = @core.instances_hash({ Name: options[:name] }, false)
       results.each do |instance|
         tags = instance.tags
         tag_hash = @core.get_tag_hash(tags)
-        if options['stop']
+        if options[:stop]
           @core.stop_instance(instance.instance_id)
         end
 
@@ -227,17 +227,17 @@ module Ec2ex
     option :stop, type: :boolean, default: false, desc: 'stop'
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     def spot
-      instance = @core.instances_hash_first_result({ Name: options['name'] }, true)
-      if options['stop']
+      instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
+      if options[:stop]
         @core.stop_instance(instance.instance_id)
       end
       image_id = @core.create_image_with_instance(instance)
 
-      Parallel.map(options['instance_count'].times.to_a, in_threads: Parallel.processor_count) do |server_index|
+      Parallel.map(options[:instance_count].times.to_a, in_threads: Parallel.processor_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         option = {
           instance_count: 1,
-          spot_price: options['price'],
+          spot_price: options[:price],
           launch_specification: {
             image_id: image_id,
             instance_type: instance.instance_type,
@@ -245,8 +245,8 @@ module Ec2ex
             subnet_id: instance.subnet_id
           },
         }
-        option[:type] = 'persistent' if options['persistent']
-        option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
+        option[:type] = 'persistent' if options[:persistent]
+        option[:block_duration_minutes] = options[:block_duration_minutes] if options[:block_duration_minutes]
 
         if instance.iam_instance_profile
           option[:launch_specification][:iam_instance_profile] = { name: instance.iam_instance_profile.arn.split('/').last }
@@ -256,13 +256,13 @@ module Ec2ex
           option[:launch_specification][:key_name] = instance.key_name
         end
 
-        option[:launch_specification].merge!(eval(options['params']))
+        option[:launch_specification].merge!(eval(options[:params]))
 
         private_ip_address = nil
-        if options['private_ip_address'].nil?
-          private_ip_address = instance.private_ip_address if options['renew']
+        if options[:private_ip_address].nil?
+          private_ip_address = instance.private_ip_address if options[:renew]
         else
-          private_ip_address = options['private_ip_address']
+          private_ip_address = options[:private_ip_address]
         end
 
         if private_ip_address
@@ -276,7 +276,7 @@ module Ec2ex
           option[:launch_specification].delete(:security_group_ids)
           option[:launch_specification].delete(:subnet_id)
         end
-        @core.terminate_instance(instance) if options['renew']
+        @core.terminate_instance(instance) if options[:renew]
 
         response = @ec2.request_spot_instances(option)
         spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
@@ -288,17 +288,17 @@ module Ec2ex
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
 
-        unless options['tag'].empty?
+        unless options[:tag].empty?
           @ec2.create_tags(
             resources: [instance_id],
             tags: @core.format_tag(
-              options['tag'],
+              options[:tag],
               @core.get_tag_hash_from_id(instance_id)
             )
           )
         end
 
-        public_ip_address = get_public_ip_address(options['public_ip_address'], instance.public_ip_address, options['renew'])
+        public_ip_address = get_public_ip_address(options[:public_ip_address], instance.public_ip_address, options[:renew])
         @core.associate_address(instance_id, public_ip_address)
       end
     end
@@ -310,22 +310,22 @@ module Ec2ex
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     option :block_duration_minutes, type: :numeric, default: nil, desc: 'block_duration_minutes'
     def run_spot
-      image = @core.latest_image_with_name(options['name'])
+      image = @core.latest_image_with_name(options[:name])
 
       tag_hash = @core.get_tag_hash(image[:tags])
-      private_ip_address = options['private_ip_address'] || tag_hash.private_ip_address
+      private_ip_address = options[:private_ip_address] || tag_hash.private_ip_address
       exit 0 if @core.ping?(private_ip_address)
 
       option = {
         instance_count: 1,
-        spot_price: options['price'],
+        spot_price: options[:price],
         launch_specification: {
           image_id: image[:image_id],
           instance_type: tag_hash.instance_type
         },
       }
 
-      option[:block_duration_minutes] = options['block_duration_minutes'] if options['block_duration_minutes']
+      option[:block_duration_minutes] = options[:block_duration_minutes] if options[:block_duration_minutes]
 
       if tag_hash.iam_instance_profile
         option[:launch_specification][:iam_instance_profile] = { name: tag_hash.iam_instance_profile }
@@ -342,7 +342,7 @@ module Ec2ex
         private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
       }
       option[:launch_specification][:network_interfaces] = [network_interface]
-      option[:launch_specification].merge!(eval(options['params']))
+      option[:launch_specification].merge!(eval(options[:params]))
 
       response = @ec2.request_spot_instances(option)
       spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
@@ -360,7 +360,7 @@ module Ec2ex
     option :acl_id, type: :string, default: '', required: true, desc: 'name tag'
     option :ip_address, type: :string, default: '', required: true, desc: 'name tag'
     def regist_deny_acl
-      acls = @ec2.describe_network_acls(network_acl_ids: [options['acl_id']])
+      acls = @ec2.describe_network_acls(network_acl_ids: [options[:acl_id]])
 
       allow_any_rule_number = acls.network_acls.first.entries.select {|r|
                          !r.egress && r.cidr_block == '0.0.0.0/0' && r.rule_action == 'allow'
@@ -372,13 +372,13 @@ module Ec2ex
 
       next_rule_number = deny_rules.empty? ? 1 : deny_rules.last.rule_number + 1
 
-      unless deny_rules.any? { |r| r.cidr_block == "#{options['ip_address']}/32" }
+      unless deny_rules.any? { |r| r.cidr_block == "#{options[:ip_address]}/32" }
         option = {
-          network_acl_id: options['acl_id'],
+          network_acl_id: options[:acl_id],
           rule_number: next_rule_number,
           rule_action: 'deny',
           protocol: '-1',
-          cidr_block: "#{options['ip_address']}/32",
+          cidr_block: "#{options[:ip_address]}/32",
           egress: false
         }
         @ec2.create_network_acl_entry(option)
@@ -388,7 +388,7 @@ module Ec2ex
     desc 'delete_deny_acl_all', 'delete deny acl'
     option :acl_id, type: :string, required: true, desc: 'name tag'
     def delete_deny_acl_all
-      acls = @ec2.describe_network_acls(network_acl_ids: [options['acl_id']])
+      acls = @ec2.describe_network_acls(network_acl_ids: [options[:acl_id]])
 
       allow_any_rule_number = acls.network_acl_set.first.entries.select {|r|
                          !r.egress && r.cidr_block == '0.0.0.0/0' && r.rule_action == 'allow'
@@ -400,7 +400,7 @@ module Ec2ex
 
       deny_rules.each do |deny_rule|
         option = {
-          network_acl_id: options['acl_id'],
+          network_acl_id: options[:acl_id],
           rule_number: deny_rule.rule_number,
           egress: false
         }
@@ -426,26 +426,26 @@ module Ec2ex
     desc 'copy_tag', 'request spot instances'
     option :source, aliases: '--src', type: :string, default: nil, required: true, desc: 'name tag'
     option :dest, aliases: '--dest', type: :string, default: nil, required: true, desc: 'name tag'
-    def copy_tag(_name = options['name'])
-      source = @core.instances_hash({ Name: options['source'] }, true)
-      dest = @core.instances_hash({ Name: options['dest'] }, true)
+    def copy_tag(_name = options[:name])
+      source = @core.instances_hash({ Name: options[:source] }, true)
+      dest = @core.instances_hash({ Name: options[:dest] }, true)
       @ec2.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: source.first.tags)
-      @ec2.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: [{ key: 'Name', value: options['dest'] }])
+      @ec2.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: [{ key: 'Name', value: options[:dest] }])
     end
 
     desc 'set_tag', 'set tag'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :tag, aliases: '-t', type: :hash, required: true, desc: 'name tag'
     def set_tag
-      instances = @core.instances_hash({ Name: options['name'] }, true)
-      tags = @core.format_tag(options['tag'])
+      instances = @core.instances_hash({ Name: options[:name] }, true)
+      tags = @core.format_tag(options[:tag])
       @ec2.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
     end
 
     desc 'set_delete_on_termination', 'set delete on termination instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def set_delete_on_termination
-      @core.instances_hash({ Name: options['name'] }, true).each do |instance|
+      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
         @core.set_delete_on_termination(instance)
         @logger.info "set delete on termination => #{instance.instance_id}"
       end
@@ -453,7 +453,7 @@ module Ec2ex
 
     desc 'search_images', 'search images'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
-    def search_images(name = options['name'])
+    def search_images(name = options[:name])
       puts_json @core.images(name)
     end
 
@@ -462,8 +462,8 @@ module Ec2ex
     option :key, aliases: '-k', type: :array, required: true, desc: 'grouping key'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
     def aggregate
-      list = @core.instances_hash(options['condition'], options['running_only']).map do |instance|
-        options['key'].map do |key|
+      list = @core.instances_hash(options[:condition], options[:running_only]).map do |instance|
+        options[:key].map do |key|
           eval("instance.#{key} ")
         end.join('_')
       end
@@ -473,7 +473,7 @@ module Ec2ex
     desc 'reboot', 'reboot instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     def reboot
-      @core.instances_hash({ Name: options['name'] }, true).each do |instance|
+      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
         @ec2.reboot_instances(instance_ids: [instance.instance_id])
         sleep 5
         @ec2.wait_until(:instance_running, instance_ids: [instance.instance_id])
@@ -483,7 +483,7 @@ module Ec2ex
     desc 'stop_start', 'stop after start instance'
     option :names, aliases: '-n', type: :array, default: [], required: true, desc: 'name tag'
     def stop_start
-      options['names'].each do |name|
+      options[:names].each do |name|
         @core.instances_hash({ Name: name }, true).each do |instance|
           instance.stop
           @ec2.wait_until(:instance_stopped, instance_ids: [instance.instance_id])
@@ -497,7 +497,7 @@ module Ec2ex
     desc 'terminate', 'terminate instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def terminate
-      instances = @core.instances_hash({ Name: options['name'] }, false)
+      instances = @core.instances_hash({ Name: options[:name] }, false)
       Parallel.map(instances, in_threads: Parallel.processor_count) do |instance|
         @core.terminate_instance(instance)
       end
@@ -506,7 +506,7 @@ module Ec2ex
     desc 'start', 'start instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def start
-      @core.instances_hash({ Name: options['name'] }, false).each do |instance|
+      @core.instances_hash({ Name: options[:name] }, false).each do |instance|
         @core.start_instance(instance.instance_id)
       end
     end
@@ -514,7 +514,7 @@ module Ec2ex
     desc 'stop', 'stop instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def stop
-      @core.instances_hash({ Name: options['name'] }, false).each do |instance|
+      @core.instances_hash({ Name: options[:name] }, false).each do |instance|
         @core.stop_instance(instance.instance_id)
       end
     end
@@ -522,9 +522,9 @@ module Ec2ex
     desc 'connect elb', 'connect elb'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :load_balancer_name, aliases: '-l', type: :string, default: '', required: true, desc: 'name tag'
-    def connect_elb(_name = options['name'])
-      @core.instances_hash({ Name: options['name'] }, true).each do |instance|
-        option = { load_balancer_name: options['load_balancer_name'], instances: [instance_id: instance.instance_id] }
+    def connect_elb(_name = options[:name])
+      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
+        option = { load_balancer_name: options[:load_balancer_name], instances: [instance_id: instance.instance_id] }
         @elb.deregister_instances_from_load_balancer(option)
         @elb.register_instances_with_load_balancer(option)
         print 'connecting ELB...'
@@ -540,8 +540,8 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :load_balancer_name, aliases: '-l', type: :string, default: '', required: true, desc: 'name tag'
     def disconnect_elb
-      @core.instances_hash({ Name: options['name'] }, true).each do |instance|
-        option = { load_balancer_name: options['load_balancer_name'], instances: [instance_id: instance.instance_id] }
+      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
+        option = { load_balancer_name: options[:load_balancer_name], instances: [instance_id: instance.instance_id] }
         @elb.deregister_instances_from_load_balancer(option)
       end
     end
@@ -572,7 +572,7 @@ module Ec2ex
     desc 'latest_image', 'show elbs'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def latest_image
-      puts_json @core.latest_image_with_name(options['name'])
+      puts_json @core.latest_image_with_name(options[:name])
     end
 
     desc 'allocate_address', 'allocate address'
@@ -584,7 +584,7 @@ module Ec2ex
     desc 'instance_metadata', 'instance metadata'
     option :path, type: :string, required: true, desc: 'path'
     def instance_metadata
-      response = @core.get_metadata(options['path'])
+      response = @core.get_metadata(options[:path])
       puts response
     end
 
@@ -592,8 +592,8 @@ module Ec2ex
     option :key, type: :string, desc: 'key'
     def own_tag
       response = @core.own_tag
-      if options['key']
-        puts response[options['key']]
+      if options[:key]
+        puts response[options[:key]]
       else
         puts_json response
       end
@@ -605,8 +605,8 @@ module Ec2ex
     end
 
     def puts_json(data)
-      unless @global_options['fields'].nil?
-        data = @core.extract_fields(data, @global_options['fields'])
+      unless @global_options[:fields].nil?
+        data = @core.extract_fields(data, @global_options[:fields])
       end
       puts JsonColor.colorize(JSON.pretty_generate(data))
     end
