@@ -123,7 +123,8 @@ module Ec2ex
     def copy
       instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
       image_id = @core.create_image_with_instance(instance)
-      Parallel.map(options[:instance_count].times.to_a, in_threads: Parallel.processor_count) do |server_index|
+      instance_count = options[:instance_count]
+      Parallel.map(instance_count.times.to_a, in_threads: Parallel.processor_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         request = {
           image_id: image_id,
@@ -153,6 +154,7 @@ module Ec2ex
         @ec2.wait_until(:instance_running, instance_ids: [instance_id])
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
+        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstaneCount', value: "#{instance_count}" }])
         unless options[:tag].nil?
           @ec2.create_tags(
             resources: [instance_id],
@@ -234,7 +236,8 @@ module Ec2ex
       end
       image_id = @core.create_image_with_instance(instance)
 
-      Parallel.map(options[:instance_count].times.to_a, in_threads: Parallel.processor_count) do |server_index|
+      instance_count = options[:instance_count]
+      Parallel.map(instance_count.times.to_a, in_threads: Parallel.processor_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         option = {
           instance_count: 1,
@@ -288,6 +291,7 @@ module Ec2ex
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
+        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstaneCount', value: "#{instance_count}" }])
 
         unless options[:tag].empty?
           @ec2.create_tags(
