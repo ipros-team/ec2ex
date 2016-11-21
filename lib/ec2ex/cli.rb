@@ -152,7 +152,7 @@ module Ec2ex
         instance_id = response.instances.first.instance_id
         @ec2.wait_until(:instance_running, instance_ids: [instance_id])
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
-        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
+        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
         unless options[:tag].nil?
           @ec2.create_tags(
@@ -289,7 +289,7 @@ module Ec2ex
 
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
-        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Index', value: "#{server_index}" }])
+        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
 
         unless options[:tag].empty?
