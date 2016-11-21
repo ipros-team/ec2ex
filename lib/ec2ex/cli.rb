@@ -3,7 +3,6 @@ require 'json'
 require 'pp'
 require 'parallel'
 require 'active_support/core_ext/hash'
-require 'json_color'
 
 module Ec2ex
   class CLI < Thor
@@ -613,7 +612,7 @@ module Ec2ex
       unless @global_options[:fields].nil?
         data = @core.extract_fields(data, @global_options[:fields])
       end
-      puts JsonColor.colorize(JSON.pretty_generate(data))
+      puts JSON.pretty_generate(data)
     end
 
     def get_public_ip_address(define_public_ip_address, instance_public_ip_address, renew)

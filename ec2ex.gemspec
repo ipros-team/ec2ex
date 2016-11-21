@@ -24,7 +24,6 @@ Gem::Specification.new do |gem|
   gem.add_dependency 'activesupport'
   gem.add_dependency 'parallel'
   gem.add_dependency 'net-ping'
-  gem.add_dependency 'json_color'
 
   gem.add_development_dependency 'bundler'
   gem.add_development_dependency 'pry', '~> 0.10.1'
