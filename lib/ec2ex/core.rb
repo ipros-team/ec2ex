@@ -61,31 +61,6 @@ module Ec2ex
       Hash[list.group_by { |e| e }.map { |k, v| [k, v.length] }]
     end
 
-    def format_tag(tag, preset_tag_hash = {})
-      tags = []
-      tag.each do |k, v|
-        value = v ? ERB.new(v.gsub(/\$\{([^}]+)\}/, "<%=preset_tag_hash['" + '\1' + "'] %>")).result(binding) : ''
-        tags << { key: k, value: value }
-      end
-      tags
-    end
-
-    def get_tag_hash(tags)
-      result = {}
-      tags.each {|hash|
-        result[hash['key'] || hash[:key]] = hash['value'] || hash[:value]
-      }
-      Hashie::Mash.new(result)
-    end
-
-    def get_tag_hash_from_id(instance_id)
-      preset_tag = {}
-      @ec2.describe_tags(filters: [{ name: 'resource-id', values: [instance_id] }]).tags.each do |tag|
-        preset_tag[tag.key] = tag.value
-      end
-      preset_tag
-    end
-
     def instances_hash(condition, running_only = true)
       filter = []
       condition.each do |key, value|
@@ -115,6 +90,31 @@ module Ec2ex
       @ec2.describe_instances(
         instance_ids: [instance_id]
       ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }.first
+    end
+
+    def format_tag(tag, preset_tag_hash = {})
+      tags = []
+      tag.each do |k, v|
+        value = v ? ERB.new(v.gsub(/\$\{([^}]+)\}/, "<%=preset_tag_hash['" + '\1' + "'] %>")).result(binding) : ''
+        tags << { key: k, value: value }
+      end
+      tags
+    end
+
+    def get_tag_hash(tags)
+      result = {}
+      tags.each {|hash|
+        result[hash['key'] || hash[:key]] = hash['value'] || hash[:value]
+      }
+      Hashie::Mash.new(result)
+    end
+
+    def get_tag_hash_from_id(instance_id)
+      preset_tag = {}
+      @ec2.describe_tags(filters: [{ name: 'resource-id', values: [instance_id] }]).tags.each do |tag|
+        preset_tag[tag.key] = tag.value
+      end
+      preset_tag
     end
 
     def own_tag
