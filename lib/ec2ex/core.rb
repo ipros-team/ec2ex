@@ -192,7 +192,10 @@ module Ec2ex
         end
         sleep 10
       end
-      @ec2.wait_until(:instance_running, instance_ids: [instance_id])
+      @ec2.wait_until(:instance_running, instance_ids: [instance_id]) do |w|
+        w.interval = 15
+        w.max_attempts = 1440
+      end
       @logger.info "spot instance create complete! instance_id => [#{instance_id}]"
       instance_id
     end

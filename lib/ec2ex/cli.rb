@@ -82,9 +82,16 @@ module Ec2ex
 
     desc 'deregister_image', 'deregister image'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
+    option :ami_name, type: :string, desc: 'ami_name'
     option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def deregister_image
-      @core.get_old_images(options[:name], options[:older_than]).each do |image|
+      images = if options[:ami_name]
+        @core.images(options[:ami_name])
+      else
+        @core.get_old_images(options[:name], options[:older_than])
+      end
+
+      images.each do |image|
         image_id = image[:image_id]
         @logger.info "delete AMI #{image_id} [#{image[:name]}]"
         @ec2.deregister_image({image_id: image_id})
@@ -123,7 +130,7 @@ module Ec2ex
       instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
       image_id = @core.create_image_with_instance(instance)
       instance_count = options[:instance_count]
-      Parallel.map(instance_count.times.to_a, in_threads: Parallel.processor_count) do |server_index|
+      Parallel.map(instance_count.times.to_a, in_threads: instance_count) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         request = {
           image_id: image_id,
@@ -236,7 +243,8 @@ module Ec2ex
       image_id = @core.create_image_with_instance(instance)
 
       instance_count = options[:instance_count]
-      Parallel.map(instance_count.times.to_a, in_threads: Parallel.processor_count) do |server_index|
+      in_threads = (instance_count > 20) ? 20 : instance_count
+      Parallel.map(instance_count.times.to_a, in_threads: in_threads) do |server_index|
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         option = {
           instance_count: 1,
@@ -502,7 +510,7 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def terminate
       instances = @core.instances_hash({ Name: options[:name] }, false)
-      Parallel.map(instances, in_threads: Parallel.processor_count) do |instance|
+      Parallel.map(instances, in_threads: instances.size) do |instance|
         @core.terminate_instance(instance)
       end
     end
