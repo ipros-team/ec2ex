@@ -361,7 +361,10 @@ module Ec2ex
       sleep 5
       instance_id = @core.wait_spot_running(spot_instance_request_id)
       @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
-      @ec2.create_tags(resources: [instance_id], tags: JSON.parse(tag_hash[:tags]))
+      @ec2.create_tags(
+        resources: [instance_id],
+        tags: @core.format_tag(JSON.parse(tag_hash.tags))
+      )
 
       if tag_hash.public_ip_address
         @core.associate_address(instance_id, tag_hash.public_ip_address)

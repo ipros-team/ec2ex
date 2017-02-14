@@ -124,7 +124,7 @@ module Ec2ex
     def get_ami_tag_hash(instance, tags)
       ami_tag_hash = {
         'created' => Time.now.strftime('%Y%m%d%H%M%S'),
-        'tags' => instance.tags.map(&:to_hash).to_json,
+        'tags' => tags.to_json,
         'Name' => tags['Name']
       }
       ami_tag_hash['security_groups'] = instance.security_groups.map(&:group_id).to_json
