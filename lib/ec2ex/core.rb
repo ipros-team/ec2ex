@@ -2,8 +2,12 @@ require 'aws-sdk'
 require 'ipaddress'
 require 'open-uri'
 require "logger"
-require 'hashie'
+require 'hashie/mash'
 require 'net/ping'
+
+class Ec2exMash < Hashie::Mash
+  disable_warnings
+end
 
 TIME_OUT = 3
 module Ec2ex
@@ -47,7 +51,7 @@ module Ec2ex
     def extract_fields(data, fields)
       results = []
       data.each do |row|
-        row = Hashie::Mash.new(row) if row.class == Hash
+        row = Ec2exMash.new(row) if row.class == Hash
         result = {}
         fields.map { |key|
           result[key] = eval("row.#{key}")
@@ -73,7 +77,7 @@ module Ec2ex
       end
       @ec2.describe_instances(
         filters: filter
-      ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }
+      ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }
     end
 
     def instances_hash_first_result(condition, running_only = true)
@@ -89,7 +93,7 @@ module Ec2ex
     def instances_hash_with_id(instance_id)
       @ec2.describe_instances(
         instance_ids: [instance_id]
-      ).data.to_h[:reservations].map { |instance| Hashie::Mash.new(instance[:instances].first) }.first
+      ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }.first
     end
 
     def format_tag(tag, preset_tag_hash = {})
@@ -106,7 +110,7 @@ module Ec2ex
       tags.each {|hash|
         result[hash['key'] || hash[:key]] = hash['value'] || hash[:value]
       }
-      Hashie::Mash.new(result)
+      Ec2exMash.new(result)
     end
 
     def get_tag_hash_from_id(instance_id)
