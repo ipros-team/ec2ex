@@ -6,7 +6,7 @@ require 'hashie/mash'
 require 'net/ping'
 
 class Ec2exMash < Hashie::Mash
-  disable_warnings
+  disable_warnings if respond_to?(:disable_warnings)
 end
 
 TIME_OUT = 3
