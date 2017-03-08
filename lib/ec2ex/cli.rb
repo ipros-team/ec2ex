@@ -265,8 +265,6 @@ module Ec2ex
           option[:launch_specification][:key_name] = instance.key_name
         end
 
-        option[:launch_specification].merge!(eval(options[:params]))
-
         private_ip_address = nil
         if options[:private_ip_address].nil?
           private_ip_address = instance.private_ip_address if options[:renew]
@@ -286,6 +284,7 @@ module Ec2ex
           option[:launch_specification][:security_group_ids] = security_group_ids
           option[:launch_specification][:subnet_id] = instance.subnet_id
         end
+        option[:launch_specification].merge!(eval(options[:params]))
         @core.terminate_instance(instance) if options[:renew]
 
         response = @ec2.request_spot_instances(option)
