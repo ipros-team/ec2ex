@@ -8,7 +8,7 @@ module Ec2ex
   class CLI < Thor
     include Thor::Actions
     map '-s' => :search
-    map '-t' => :search_by_tags
+    map '--st' => :search_by_tags
     map '-i' => :search_images
     map '-a' => :aggregate
 
@@ -25,17 +25,17 @@ module Ec2ex
 
     desc 'search', 'search instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
-    option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
+    option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'search running only instances.'
     def search(name = options[:name])
       results = @core.instances_hash({ Name: name }, options[:running_only])
       puts_json results
     end
 
     desc 'search_by_tags', 'search by tags instance'
-    option :condition, aliases: '-c', type: :hash, default: {}, desc: 'grouping key'
-    option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
+    option :tag, aliases: '-t', type: :hash, default: {}, desc: 'exp. Stages:production'
+    option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'search running only instances.'
     def search_by_tags
-      puts_json @core.instances_hash(options[:condition], options[:running_only])
+      puts_json @core.instances_hash(options[:tag], options[:running_only])
     end
 
     desc 'reserved', 'reserved instance'
