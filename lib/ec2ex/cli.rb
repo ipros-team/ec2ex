@@ -12,7 +12,6 @@ module Ec2ex
     map '-i' => :search_images
     map '-a' => :aggregate
 
-    class_option :profile, type: :string, default: 'default', required: true, desc: 'name tag'
     class_option :fields, type: :array, default: nil, desc: 'fields'
     def initialize(args = [], options = {}, config = {})
       super(args, options, config)
