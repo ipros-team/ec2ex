@@ -182,7 +182,7 @@ module Ec2ex
     end
 
     def wait_spot_running(spot_instance_request_id)
-      @logger.info 'spot instance creating...'
+      @logger.info "spot instance creating..."
       instance_id = nil
       while true
         spot_instance_request = @ec2.describe_spot_instance_requests(spot_instance_request_ids: [spot_instance_request_id]).spot_instance_requests.first
@@ -201,6 +201,12 @@ module Ec2ex
         w.max_attempts = 1440
       end
 
+      @logger.info "spot instance create complete! instance_id => [#{instance_id}]"
+      instance_id
+    end
+
+    def wait_instance_status_ok(instance_id)
+      @logger.info "waiting instance status ok... instance_id => [#{instance_id}]"
       while true
         res = @ec2.describe_instance_status(instance_ids: [instance_id])
         instance_status = res.instance_statuses.first.instance_status.status
@@ -209,9 +215,7 @@ module Ec2ex
         end
         sleep 10
       end
-
-      @logger.info "spot instance create complete! instance_id => [#{instance_id}]"
-      instance_id
+      @logger.info "ready instance! instance_id => [#{instance_id}]"
     end
 
     def set_delete_on_termination(instance)
