@@ -200,6 +200,16 @@ module Ec2ex
         w.interval = 15
         w.max_attempts = 1440
       end
+
+      while true
+        res = @ec2.describe_instance_status(instance_ids: [instance_id])
+        instance_status = res.instance_statuses.first.instance_status.status
+        if instance_status == 'ok'
+          break
+        end
+        sleep 10
+      end
+
       @logger.info "spot instance create complete! instance_id => [#{instance_id}]"
       instance_id
     end
