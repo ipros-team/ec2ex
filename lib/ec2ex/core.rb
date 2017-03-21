@@ -95,59 +95,8 @@ module Ec2ex
       ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }.first
     end
 
-    def format_tag(tag, preset_tag_hash = {})
-      tags = []
-      tag.each do |k, v|
-        value = v ? ERB.new(v.gsub(/\$\{([^}]+)\}/, "<%=preset_tag_hash['" + '\1' + "'] %>")).result(binding) : ''
-        tags << { key: k, value: value }
-      end
-      tags
-    end
-
-    def get_tag_hash(tags)
-      result = {}
-      tags.each {|hash|
-        result[hash['key'] || hash[:key]] = hash['value'] || hash[:value]
-      }
-      Ec2exMash.new(result)
-    end
-
-    def get_tag_hash_from_id(instance_id)
-      preset_tag = {}
-      @ec2.describe_tags(filters: [{ name: 'resource-id', values: [instance_id] }]).tags.each do |tag|
-        preset_tag[tag.key] = tag.value
-      end
-      preset_tag
-    end
-
-    def own_tag
-      get_tag_hash(instances_hash_with_id(get_metadata('/latest/meta-data/instance-id')).tags)
-    end
-
-    def get_ami_tag_hash(instance, tags)
-      ami_tag_hash = {
-        'created' => Time.now.strftime('%Y%m%d%H%M%S'),
-        'tags' => tags.to_json,
-        'Name' => tags['Name']
-      }
-      ami_tag_hash['security_groups'] = instance.security_groups.map(&:group_id).to_json
-      ami_tag_hash['private_ip_address'] = instance.private_ip_address
-      unless instance.public_ip_address.nil?
-        ami_tag_hash['public_ip_address'] = instance.public_ip_address
-      end
-      ami_tag_hash['instance_type'] = instance.instance_type
-      ami_tag_hash['placement'] = instance.placement.to_hash.to_json
-      unless instance.iam_instance_profile.nil?
-        ami_tag_hash['iam_instance_profile'] = instance.iam_instance_profile.arn.split('/').last
-      end
-      unless instance.key_name.nil?
-        ami_tag_hash['key_name'] = instance.key_name
-      end
-      ami_tag_hash
-    end
-
     def create_image_with_instance(instance, region = nil)
-      tags = get_tag_hash(instance.tags)
+      tags = Tag.get_hash(instance.tags)
       @logger.info "#{tags['Name']} image creating..."
 
       image_name = tags['Name'] + ".#{Time.now.strftime('%Y%m%d%H%M%S')}"
@@ -163,7 +112,7 @@ module Ec2ex
       end
       @logger.info "image create complete #{tags['Name']}! image_id => [#{image_response.image_id}]"
 
-      ami_tag = format_tag(get_ami_tag_hash(instance, tags))
+      ami_tag = Tag.format(Tag.get_ami_tag_hash(instance, tags))
       @ec2.create_tags(resources: [image_response.image_id], tags: ami_tag)
 
       if region
@@ -277,7 +226,7 @@ module Ec2ex
     def latest_image_with_name(name)
       result = search_image_with_name(name)
       result = result.sort_by{ |image|
-        tag_hash = get_tag_hash(image[:tags])
+        tag_hash = Tag.get_hash(image[:tags])
         tag_hash['created'].nil? ? '' : tag_hash['created']
       }
       result.empty? ? {} : result.last
@@ -288,14 +237,14 @@ module Ec2ex
       return [] if result.empty?
       map = Hash.new{|h,k| h[k] = []}
       result = result.each{ |image|
-        tag_hash = get_tag_hash(image[:tags])
+        tag_hash = Tag.get_hash(image[:tags])
         next if tag_hash['Name'].nil? || tag_hash['created'].nil?
         map[tag_hash['Name']] << image
       }
       old_images = []
       map.each do |name, images|
         sorted_images = images.sort_by{ |image|
-          tag_hash = get_tag_hash(image[:tags])
+          tag_hash = Tag.get_hash(image[:tags])
           Time.parse(tag_hash['created'])
         }
         newly_images = sorted_images.last(num)

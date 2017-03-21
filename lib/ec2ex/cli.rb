@@ -19,6 +19,7 @@ module Ec2ex
       @core = Core.new
       @ec2 = @core.client
       @elb = @core.elb_client
+      @tag = Tag.new(@core)
       @logger = @core.logger
     end
 
@@ -170,9 +171,9 @@ module Ec2ex
           unless options[:tag].nil?
             @ec2.create_tags(
               resources: [instance_id],
-              tags: @core.format_tag(
+              tags: Tag.format(
                 options[:tag],
-                @core.get_tag_hash_from_id(instance_id)
+                @tag.get_hash_from_id(instance_id)
               )
             )
           end
@@ -194,7 +195,7 @@ module Ec2ex
       results = @core.instances_hash({ Name: options[:name] }, false)
       results.each do |instance|
         tags = instance.tags
-        tag_hash = @core.get_tag_hash(tags)
+        tag_hash = Tag.get_hash(tags)
         if options[:stop]
           @core.stop_instance(instance.instance_id)
         end
@@ -316,9 +317,9 @@ module Ec2ex
           unless options[:tag].empty?
             @ec2.create_tags(
               resources: [instance_id],
-              tags: @core.format_tag(
+              tags: Tag.format(
                 options[:tag],
-                @core.get_tag_hash_from_id(instance_id)
+                @tag.get_hash_from_id(instance_id)
               )
             )
           end
@@ -342,7 +343,7 @@ module Ec2ex
     def run_spot
       image = @core.latest_image_with_name(options[:name])
 
-      tag_hash = @core.get_tag_hash(image[:tags])
+      tag_hash = Tag.get_hash(image[:tags])
       instance_count = options[:instance_count]
 
       private_ip_address = options[:private_ip_address] || tag_hash.private_ip_address
@@ -397,7 +398,7 @@ module Ec2ex
         @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
         @ec2.create_tags(
           resources: [instance_id],
-          tags: @core.format_tag(JSON.parse(tag_hash.tags))
+          tags: Tag.format(JSON.parse(tag_hash.tags))
         )
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
         @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
@@ -405,9 +406,9 @@ module Ec2ex
         unless options[:tag].empty?
           @ec2.create_tags(
             resources: [instance_id],
-            tags: @core.format_tag(
+            tags: Tag.format(
               options[:tag],
-              @core.get_tag_hash_from_id(instance_id)
+              @tag.get_hash_from_id(instance_id)
             )
           )
         end
@@ -500,7 +501,7 @@ module Ec2ex
     option :tag, aliases: '-t', type: :hash, required: true, desc: 'name tag'
     def set_tag
       instances = @core.instances_hash({ Name: options[:name] }, true)
-      tags = @core.format_tag(options[:tag])
+      tags = Tag.format(options[:tag])
       @ec2.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
     end
 
@@ -653,7 +654,7 @@ module Ec2ex
     desc 'own_tag', 'own tag'
     option :key, type: :string, desc: 'key'
     def own_tag
-      response = @core.own_tag
+      response = @tag.get_own
       if options[:key]
         puts response[options[:key]]
       else
