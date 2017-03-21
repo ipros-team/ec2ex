@@ -9,7 +9,6 @@ class Ec2exMash < Hashie::Mash
   disable_warnings if respond_to?(:disable_warnings)
 end
 
-TIME_OUT = 3
 module Ec2ex
   class Core
     def initialize
