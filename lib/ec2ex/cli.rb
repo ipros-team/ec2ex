@@ -125,9 +125,10 @@ module Ec2ex
     option :private_ip_address, type: :string, default: nil, desc: 'private_ip_address'
     option :public_ip_address, type: :string, default: nil, desc: 'public_ip_address'
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
+    option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
     def copy
       instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
-      image_id = @core.create_image_with_instance(instance)
+      image_id = options[:image_id] || @core.create_image_with_instance(instance)
 
       instance_count = options[:instance_count]
       in_threads = (instance_count > 20) ? 20 : instance_count
@@ -243,6 +244,7 @@ module Ec2ex
     option :persistent, type: :boolean, default: false, desc: 'persistent request'
     option :stop, type: :boolean, default: false, desc: 'stop'
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
+    option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
     def spot
       instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
       if options[:stop]
@@ -252,7 +254,7 @@ module Ec2ex
       instance_count = options[:instance_count]
       in_threads = (instance_count > 20) ? 20 : instance_count
 
-      image_id = @core.create_image_with_instance(instance)
+      image_id = options[:image_id] || @core.create_image_with_instance(instance)
 
       groups = instance_count.times.to_a.each_slice(in_threads).to_a
       groups.each do |group|
