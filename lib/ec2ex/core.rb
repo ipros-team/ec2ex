@@ -39,7 +39,7 @@ module Ec2ex
           return body
         }
         return result
-      rescue TimeoutError => e
+      rescue Timeout::Error => e
         raise "not EC2 instance"
       end
     end
