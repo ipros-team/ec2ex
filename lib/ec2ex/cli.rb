@@ -20,6 +20,7 @@ module Ec2ex
       @ec2 = @core.client
       @elb = @core.elb_client
       @tag = Tag.new(@core)
+      @ami = Ami.new(@core)
       @logger = @core.logger
     end
 
@@ -73,7 +74,7 @@ module Ec2ex
       results = @core.instances_hash({ Name: options[:name] }, false)
       Parallel.map(results, in_threads: options[:proc]) do |instance|
         begin
-          @core.create_image_with_instance(instance, options[:region])
+          @ami.create_image_with_instance(instance, options[:region])
         rescue => e
           @logger.info "\n#{e.message}\n#{e.backtrace.join("\n")}"
         end
@@ -86,9 +87,9 @@ module Ec2ex
     option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def deregister_image
       images = if options[:ami_name]
-        @core.images(options[:ami_name])
+        @ami.search_images(options[:ami_name])
       else
-        @core.get_old_images(options[:name], options[:older_than])
+        @ami.get_old_images(options[:name], options[:older_than])
       end
 
       images.each do |image|
@@ -110,13 +111,13 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def old_images
-      puts_json(@core.get_old_images(options[:name], options[:older_than]))
+      puts_json(@ami.get_old_images(options[:name], options[:older_than]))
     end
 
     desc 'deregister_snapshot_no_related', 'AMI not related snapshot basis delete all'
     option :owner_id, type: :string, required: true, desc: 'owner_id'
     def deregister_snapshot_no_related
-      @core.deregister_snapshot_no_related(options[:owner_id])
+      @ami.deregister_snapshot_no_related(options[:owner_id])
     end
 
     desc 'copy', 'copy instance'
@@ -129,7 +130,7 @@ module Ec2ex
     option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
     def copy
       instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
-      image_id = options[:image_id] || @core.create_image_with_instance(instance)
+      image_id = options[:image_id] || @ami.create_image_with_instance(instance)
 
       instance_count = options[:instance_count]
       in_threads = (instance_count > 20) ? 20 : instance_count
@@ -200,7 +201,7 @@ module Ec2ex
           @core.stop_instance(instance.instance_id)
         end
 
-        image_id = @core.create_image_with_instance(instance)
+        image_id = @ami.create_image_with_instance(instance)
 
         @core.terminate_instance(instance)
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
@@ -255,7 +256,7 @@ module Ec2ex
       instance_count = options[:instance_count]
       in_threads = (instance_count > 20) ? 20 : instance_count
 
-      image_id = options[:image_id] || @core.create_image_with_instance(instance)
+      image_id = options[:image_id] || @ami.create_image_with_instance(instance)
 
       groups = instance_count.times.to_a.each_slice(in_threads).to_a
       groups.each do |group|
@@ -341,7 +342,7 @@ module Ec2ex
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'tag'
     def run_spot
-      image = @core.latest_image_with_name(options[:name])
+      image = @ami.latest_image_with_name(options[:name])
 
       tag_hash = Tag.get_hash(image[:tags])
       instance_count = options[:instance_count]
@@ -517,7 +518,7 @@ module Ec2ex
     desc 'search_images', 'search images'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     def search_images(name = options[:name])
-      puts_json @core.images(name)
+      puts_json @ami.search_images(name)
     end
 
     desc 'aggregate', 'say hello to NAME'
@@ -635,7 +636,7 @@ module Ec2ex
     desc 'latest_image', 'show elbs'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def latest_image
-      puts_json @core.latest_image_with_name(options[:name])
+      puts_json @ami.latest_image_with_name(options[:name])
     end
 
     desc 'allocate_address', 'allocate address'
