@@ -42,30 +42,7 @@ module Ec2ex
 
     desc 'reserved', 'reserved instance'
     def reserved
-      filter = []
-      filter << { name: 'state', values: ['active'] }
-      reserved_hash = {}
-      @ec2.describe_reserved_instances(filters: filter)[:reserved_instances].each{ |reserved|
-        key = "#{reserved[:instance_type]}_#{reserved[:availability_zone]}"
-        sum = reserved_hash[key] || 0
-        reserved_hash[key] = sum + reserved[:instance_count]
-      }
-      list = @core.instances_hash({}, true).select { |instance| instance[:instance_lifecycle].nil? }
-      list = list.map{ |_instance|
-        ['instance_type', 'placement.availability_zone'].map do |key|
-          eval("_instance.#{key} ")
-        end.join('_')
-      }
-      result = {}
-      Util.group_count(list).each do |k, v|
-        result[k] = { instance_count: v, reserved_count: 0 }
-      end
-      reserved_hash.each do |k, v|
-        hash = result[k] || { instance_count: 0 }
-        hash[:reserved_count] = v
-        result[k] = hash
-      end
-      puts_json(result)
+      puts_json(@core.reserved)
     end
 
     desc 'create_image', 'create image'
