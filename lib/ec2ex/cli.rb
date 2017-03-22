@@ -231,7 +231,7 @@ module Ec2ex
       puts_json @ami.search_images(name)
     end
 
-    desc 'aggregate', 'say hello to NAME'
+    desc 'aggregate', 'aggregate'
     option :condition, aliases: '-c', type: :hash, default: {}, desc: 'grouping key'
     option :key, aliases: '-k', type: :array, required: true, desc: 'grouping key'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
