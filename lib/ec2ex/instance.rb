@@ -1,11 +1,3 @@
-require 'aws-sdk'
-require "logger"
-require 'hashie/mash'
-
-class Ec2exMash < Hashie::Mash
-  disable_warnings if respond_to?(:disable_warnings)
-end
-
 module Ec2ex
   class Instance < Base
 
@@ -21,7 +13,7 @@ module Ec2ex
       end
       @core.client.describe_instances(
         filters: filter
-      ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }
+      ).data.to_h[:reservations].map { |instance| ::Ec2ex::Mash.new(instance[:instances].first) }
     end
 
     def instances_hash_first_result(condition, running_only = true)
@@ -37,7 +29,7 @@ module Ec2ex
     def instances_hash_with_id(instance_id)
       @core.client.describe_instances(
         instance_ids: [instance_id]
-      ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }.first
+      ).data.to_h[:reservations].map { |instance| ::Ec2ex::Mash.new(instance[:instances].first) }.first
     end
 
     def wait_spot_running(spot_instance_request_id)

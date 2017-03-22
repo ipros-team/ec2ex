@@ -1,10 +1,5 @@
 require 'aws-sdk'
 require "logger"
-require 'hashie/mash'
-
-class Ec2exMash < Hashie::Mash
-  disable_warnings if respond_to?(:disable_warnings)
-end
 
 module Ec2ex
   class Core

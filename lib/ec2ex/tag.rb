@@ -15,7 +15,7 @@ module Ec2ex
         tags.each {|hash|
           result[hash['key'] || hash[:key]] = hash['value'] || hash[:value]
         }
-        Ec2exMash.new(result)
+        ::Ec2ex::Mash.new(result)
       end
 
       def get_ami_tag_hash(instance, tags)

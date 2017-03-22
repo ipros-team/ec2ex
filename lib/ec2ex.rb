@@ -1,4 +1,5 @@
 require 'ec2ex/version'
+require 'ec2ex/ec2ex_mash'
 require 'ec2ex/constants'
 require 'ec2ex/util'
 require 'ec2ex/core'

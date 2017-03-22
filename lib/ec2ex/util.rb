@@ -4,7 +4,7 @@ module Ec2ex
       def extract_fields(data, fields)
         results = []
         data.each do |row|
-          row = Ec2exMash.new(row) if row.class == Hash
+          row = ::Ec2ex::Mash.new(row) if row.class == Hash
           result = {}
           fields.map { |key|
             result[key] = eval("row.#{key}")
