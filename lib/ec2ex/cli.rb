@@ -19,10 +19,10 @@ module Ec2ex
       @core = Core.new
       @ec2 = @core.client
       @elb = @core.elb_client
+      @logger = @core.logger
       @tag = Tag.new(@core)
       @ami = Ami.new(@core)
       @network = Network.new(@core)
-      @logger = @core.logger
     end
 
     desc 'search', 'search instance'
@@ -65,25 +65,7 @@ module Ec2ex
     option :ami_name, type: :string, desc: 'ami_name'
     option :older_than, aliases: '--older_than', type: :numeric, default: 30, desc: 'older than count.'
     def deregister_image
-      images = if options[:ami_name]
-        @ami.search_images(options[:ami_name])
-      else
-        @ami.get_old_images(options[:name], options[:older_than])
-      end
-
-      images.each do |image|
-        image_id = image[:image_id]
-        @logger.info "delete AMI #{image_id} [#{image[:name]}]"
-        @ec2.deregister_image({image_id: image_id})
-        snapshot_ids = image[:block_device_mappings]
-            .select{ |block_device_mapping| block_device_mapping[:ebs] != nil }
-            .map{ |block_device_mapping| block_device_mapping[:ebs][:snapshot_id] }
-
-        snapshot_ids.each do |snapshot_id|
-          @logger.info "delete snapshot #{snapshot_id}"
-          @ec2.delete_snapshot({snapshot_id: snapshot_id})
-        end
-      end
+      @ami.deregister_image(ami_name: options[:ami_name], name: options[:name], older_than: options[:older_than])
     end
 
     desc 'deregister_image', 'deregister image'

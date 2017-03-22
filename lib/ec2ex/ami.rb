@@ -4,6 +4,28 @@ module Ec2ex
       @core = core
     end
 
+    def deregister_image(ami_name:, name:, older_than:)
+      images = if ami_name
+        search_images(ami_name)
+      else
+        get_old_images(name, older_than)
+      end
+
+      images.each do |image|
+        image_id = image[:image_id]
+        @core.logger.info "delete AMI #{image_id} [#{image[:name]}]"
+        @core.client.deregister_image({image_id: image_id})
+        snapshot_ids = image[:block_device_mappings]
+            .select{ |block_device_mapping| block_device_mapping[:ebs] != nil }
+            .map{ |block_device_mapping| block_device_mapping[:ebs][:snapshot_id] }
+
+        snapshot_ids.each do |snapshot_id|
+          @core.logger.info "delete snapshot #{snapshot_id}"
+          @core.client.delete_snapshot({snapshot_id: snapshot_id})
+        end
+      end
+    end
+
     def create_image_with_instance(instance, region = nil)
       tags = Tag.get_hash(instance.tags)
       @core.logger.info "#{tags['Name']} image creating..."
