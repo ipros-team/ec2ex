@@ -55,7 +55,7 @@ module Ec2ex
 
     def get_own
       self.class.get_hash(
-        @core.instances_hash_with_id(Metadata.get_metadata('/latest/meta-data/instance-id')).tags
+        @instance.instances_hash_with_id(Metadata.get_metadata('/latest/meta-data/instance-id')).tags
       )
     end
   end

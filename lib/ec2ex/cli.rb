@@ -17,19 +17,17 @@ module Ec2ex
       super(args, options, config)
       @global_options = config[:shell].base.options
       @core = Core.new
-      @ec2 = @core.client
-      @elb = @core.elb_client
-      @logger = @core.logger
       @tag = Tag.new(@core)
       @ami = Ami.new(@core)
       @network = Network.new(@core)
+      @instance = Instance.new(@core)
     end
 
     desc 'search', 'search instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'search running only instances.'
     def search(name = options[:name])
-      results = @core.instances_hash({ Name: name }, options[:running_only])
+      results = @instance.instances_hash({ Name: name }, options[:running_only])
       puts_json results
     end
 
@@ -37,12 +35,12 @@ module Ec2ex
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'exp. Stages:production'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'search running only instances.'
     def search_by_tags
-      puts_json @core.instances_hash(options[:tag], options[:running_only])
+      puts_json @instance.instances_hash(options[:tag], options[:running_only])
     end
 
     desc 'reserved', 'reserved instance'
     def reserved
-      puts_json(@core.reserved)
+      puts_json(@instance.reserved)
     end
 
     desc 'create_image', 'create image'
@@ -50,12 +48,12 @@ module Ec2ex
     option :proc, type: :numeric, default: Parallel.processor_count, desc: 'Number of parallel'
     option :region, aliases: '-r', type: :string, required: false, default: nil, desc: 'region'
     def create_image
-      results = @core.instances_hash({ Name: options[:name] }, false)
+      results = @instance.instances_hash({ Name: options[:name] }, false)
       Parallel.map(results, in_threads: options[:proc]) do |instance|
         begin
           @ami.create_image_with_instance(instance, options[:region])
         rescue => e
-          @logger.info "\n#{e.message}\n#{e.backtrace.join("\n")}"
+          @core.logger.info "\n#{e.message}\n#{e.backtrace.join("\n")}"
         end
       end
     end
@@ -90,7 +88,7 @@ module Ec2ex
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
     def copy
-      instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
+      instance = @instance.instances_hash_first_result({ Name: options[:name] }, true)
       image_id = options[:image_id] || @ami.create_image_with_instance(instance)
 
       instance_count = options[:instance_count]
@@ -124,14 +122,14 @@ module Ec2ex
             instance.subnet_id
           end
 
-          response = @ec2.run_instances(request)
+          response = @core.client.run_instances(request)
           instance_id = response.instances.first.instance_id
-          @ec2.wait_until(:instance_running, instance_ids: [instance_id])
-          @ec2.create_tags(resources: [instance_id], tags: instance.tags)
-          @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
-          @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
+          @core.client.wait_until(:instance_running, instance_ids: [instance_id])
+          @core.client.create_tags(resources: [instance_id], tags: instance.tags)
+          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
+          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
           unless options[:tag].nil?
-            @ec2.create_tags(
+            @core.client.create_tags(
               resources: [instance_id],
               tags: Tag.format(
                 options[:tag],
@@ -139,11 +137,11 @@ module Ec2ex
               )
             )
           end
-          @core.wait_instance_status_ok(instance_id) if is_last
+          @instance.wait_instance_status_ok(instance_id) if is_last
 
           public_ip_address = @network.get_public_ip_address(options[:public_ip_address], instance.public_ip_address, false)
           @network.associate_address(instance_id, public_ip_address)
-          @logger.info("created instance => #{instance_id}")
+          @core.logger.info("created instance => #{instance_id}")
         end
       end
     end
@@ -154,17 +152,17 @@ module Ec2ex
     option :params, aliases: '-p', type: :string, default: '{}', desc: 'params'
     def renew
       params = eval(options[:params])
-      results = @core.instances_hash({ Name: options[:name] }, false)
+      results = @instance.instances_hash({ Name: options[:name] }, false)
       results.each do |instance|
         tags = instance.tags
         tag_hash = Tag.get_hash(tags)
         if options[:stop]
-          @core.stop_instance(instance.instance_id)
+          @instance.stop_instance(instance.instance_id)
         end
 
         image_id = @ami.create_image_with_instance(instance)
 
-        @core.terminate_instance(instance)
+        @instance.terminate_instance(instance)
         security_group_ids = instance.security_groups.map { |security_group| security_group.group_id }
         request = {
           image_id: image_id,
@@ -185,11 +183,11 @@ module Ec2ex
         request.merge!(params)
         request[:subnet_id] = @network.get_subnet(request[:private_ip_address]).subnet_id
 
-        response = @ec2.run_instances(request)
+        response = @core.client.run_instances(request)
         instance_id = response.instances.first.instance_id
         sleep 5
-        @ec2.wait_until(:instance_running, instance_ids: [instance_id])
-        @ec2.create_tags(resources: [instance_id], tags: instance.tags)
+        @core.client.wait_until(:instance_running, instance_ids: [instance_id])
+        @core.client.create_tags(resources: [instance_id], tags: instance.tags)
 
         @network.associate_address(instance_id, instance.public_ip_address)
       end
@@ -209,9 +207,9 @@ module Ec2ex
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
     def spot
-      instance = @core.instances_hash_first_result({ Name: options[:name] }, true)
+      instance = @instance.instances_hash_first_result({ Name: options[:name] }, true)
       if options[:stop]
-        @core.stop_instance(instance.instance_id)
+        @instance.stop_instance(instance.instance_id)
       end
 
       instance_count = options[:instance_count]
@@ -263,21 +261,21 @@ module Ec2ex
             option[:launch_specification][:subnet_id] = instance.subnet_id
           end
           option[:launch_specification].merge!(eval(options[:params]))
-          @core.terminate_instance(instance) if options[:renew]
+          @instance.terminate_instance(instance) if options[:renew]
 
-          response = @ec2.request_spot_instances(option)
+          response = @core.client.request_spot_instances(option)
           spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
           sleep 5
-          instance_id = @core.wait_spot_running(spot_instance_request_id)
-          @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
+          instance_id = @instance.wait_spot_running(spot_instance_request_id)
+          @instance.set_delete_on_termination(@instance.instances_hash_with_id(instance_id))
 
-          @ec2.create_tags(resources: [instance_id], tags: instance.tags)
-          @ec2.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
-          @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
-          @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
+          @core.client.create_tags(resources: [instance_id], tags: instance.tags)
+          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
+          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
+          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
 
           unless options[:tag].empty?
-            @ec2.create_tags(
+            @core.client.create_tags(
               resources: [instance_id],
               tags: Tag.format(
                 options[:tag],
@@ -286,7 +284,7 @@ module Ec2ex
             )
           end
 
-          @core.wait_instance_status_ok(instance_id) if is_last
+          @instance.wait_instance_status_ok(instance_id) if is_last
 
           public_ip_address = @network.get_public_ip_address(options[:public_ip_address], instance.public_ip_address, options[:renew])
           @network.associate_address(instance_id, public_ip_address)
@@ -353,20 +351,20 @@ module Ec2ex
 
         option[:launch_specification].merge!(eval(options[:params]))
 
-        response = @ec2.request_spot_instances(option)
+        response = @core.client.request_spot_instances(option)
         spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
         sleep 5
-        instance_id = @core.wait_spot_running(spot_instance_request_id)
-        @core.set_delete_on_termination(@core.instances_hash_with_id(instance_id))
-        @ec2.create_tags(
+        instance_id = @instance.wait_spot_running(spot_instance_request_id)
+        @instance.set_delete_on_termination(@instance.instances_hash_with_id(instance_id))
+        @core.client.create_tags(
           resources: [instance_id],
           tags: Tag.format(JSON.parse(tag_hash.tags))
         )
-        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
-        @ec2.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
+        @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
+        @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
 
         unless options[:tag].empty?
-          @ec2.create_tags(
+          @core.client.create_tags(
             resources: [instance_id],
             tags: Tag.format(
               options[:tag],
@@ -385,7 +383,7 @@ module Ec2ex
     option :acl_id, type: :string, default: '', required: true, desc: 'name tag'
     option :ip_address, type: :string, default: '', required: true, desc: 'name tag'
     def regist_deny_acl
-      acls = @ec2.describe_network_acls(network_acl_ids: [options[:acl_id]])
+      acls = @core.client.describe_network_acls(network_acl_ids: [options[:acl_id]])
 
       allow_any_rule_number = acls.network_acls.first.entries.select {|r|
                          !r.egress && r.cidr_block == '0.0.0.0/0' && r.rule_action == 'allow'
@@ -406,14 +404,14 @@ module Ec2ex
           cidr_block: "#{options[:ip_address]}/32",
           egress: false
         }
-        @ec2.create_network_acl_entry(option)
+        @core.client.create_network_acl_entry(option)
       end
     end
 
     desc 'delete_deny_acl_all', 'delete deny acl'
     option :acl_id, type: :string, required: true, desc: 'name tag'
     def delete_deny_acl_all
-      acls = @ec2.describe_network_acls(network_acl_ids: [options[:acl_id]])
+      acls = @core.client.describe_network_acls(network_acl_ids: [options[:acl_id]])
 
       allow_any_rule_number = acls.network_acl_set.first.entries.select {|r|
                          !r.egress && r.cidr_block == '0.0.0.0/0' && r.rule_action == 'allow'
@@ -429,50 +427,50 @@ module Ec2ex
           rule_number: deny_rule.rule_number,
           egress: false
         }
-        @ec2.delete_network_acl_entry(option)
+        @core.client.delete_network_acl_entry(option)
       end
     end
 
     desc 'acls', 'show acls'
     def acls
-      puts_json(@ec2.describe_network_acls.data.to_hash[:network_acls])
+      puts_json(@core.client.describe_network_acls.data.to_hash[:network_acls])
     end
 
     desc 'subnets', 'show subnets'
     def subnets
-      puts_json(@ec2.describe_subnets.data.to_hash[:subnets])
+      puts_json(@core.client.describe_subnets.data.to_hash[:subnets])
     end
 
     desc 'sg', 'show security groups'
     def sg
-      puts_json(@ec2.describe_security_groups.data.to_hash[:security_groups])
+      puts_json(@core.client.describe_security_groups.data.to_hash[:security_groups])
     end
 
     desc 'copy_tag', 'request spot instances'
     option :source, aliases: '--src', type: :string, default: nil, required: true, desc: 'name tag'
     option :dest, aliases: '--dest', type: :string, default: nil, required: true, desc: 'name tag'
     def copy_tag(_name = options[:name])
-      source = @core.instances_hash({ Name: options[:source] }, true)
-      dest = @core.instances_hash({ Name: options[:dest] }, true)
-      @ec2.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: source.first.tags)
-      @ec2.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: [{ key: 'Name', value: options[:dest] }])
+      source = @instance.instances_hash({ Name: options[:source] }, true)
+      dest = @instance.instances_hash({ Name: options[:dest] }, true)
+      @core.client.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: source.first.tags)
+      @core.client.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: [{ key: 'Name', value: options[:dest] }])
     end
 
     desc 'set_tag', 'set tag'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :tag, aliases: '-t', type: :hash, required: true, desc: 'name tag'
     def set_tag
-      instances = @core.instances_hash({ Name: options[:name] }, true)
+      instances = @instance.instances_hash({ Name: options[:name] }, true)
       tags = Tag.format(options[:tag])
-      @ec2.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
+      @core.client.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
     end
 
     desc 'set_delete_on_termination', 'set delete on termination instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def set_delete_on_termination
-      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
-        @core.set_delete_on_termination(instance)
-        @logger.info "set delete on termination => #{instance.instance_id}"
+      @instance.instances_hash({ Name: options[:name] }, true).each do |instance|
+        @instance.set_delete_on_termination(instance)
+        @core.logger.info "set delete on termination => #{instance.instance_id}"
       end
     end
 
@@ -487,21 +485,21 @@ module Ec2ex
     option :key, aliases: '-k', type: :array, required: true, desc: 'grouping key'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'grouping key'
     def aggregate
-      list = @core.instances_hash(options[:condition], options[:running_only]).map do |instance|
+      list = @instance.instances_hash(options[:condition], options[:running_only]).map do |instance|
         options[:key].map do |key|
           eval("instance.#{key} ")
         end.join('_')
       end
-      puts @core.group_count(list).to_json
+      puts Util.group_count(list).to_json
     end
 
     desc 'reboot', 'reboot instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     def reboot
-      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
-        @ec2.reboot_instances(instance_ids: [instance.instance_id])
+      @instance.instances_hash({ Name: options[:name] }, true).each do |instance|
+        @core.client.reboot_instances(instance_ids: [instance.instance_id])
         sleep 5
-        @ec2.wait_until(:instance_running, instance_ids: [instance.instance_id])
+        @core.client.wait_until(:instance_running, instance_ids: [instance.instance_id])
       end
     end
 
@@ -509,12 +507,12 @@ module Ec2ex
     option :names, aliases: '-n', type: :array, default: [], required: true, desc: 'name tag'
     def stop_start
       options[:names].each do |name|
-        @core.instances_hash({ Name: name }, true).each do |instance|
+        @instance.instances_hash({ Name: name }, true).each do |instance|
           instance.stop
-          @ec2.wait_until(:instance_stopped, instance_ids: [instance.instance_id])
+          @core.client.wait_until(:instance_stopped, instance_ids: [instance.instance_id])
           instance.start
-          @ec2.wait_until(:instance_running, instance_ids: [instance.instance_id])
-          @logger.info "#{instance.tags['Name']} restart complete!"
+          @core.client.wait_until(:instance_running, instance_ids: [instance.instance_id])
+          @core.logger.info "#{instance.tags['Name']} restart complete!"
         end
       end
     end
@@ -522,25 +520,25 @@ module Ec2ex
     desc 'terminate', 'terminate instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def terminate
-      instances = @core.instances_hash({ Name: options[:name] }, false)
+      instances = @instance.instances_hash({ Name: options[:name] }, false)
       Parallel.map(instances, in_threads: instances.size) do |instance|
-        @core.terminate_instance(instance)
+        @instance.terminate_instance(instance)
       end
     end
 
     desc 'start', 'start instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def start
-      @core.instances_hash({ Name: options[:name] }, false).each do |instance|
-        @core.start_instance(instance.instance_id)
+      @instance.instances_hash({ Name: options[:name] }, false).each do |instance|
+        @instance.start_instance(instance.instance_id)
       end
     end
 
     desc 'stop', 'stop instance'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     def stop
-      @core.instances_hash({ Name: options[:name] }, false).each do |instance|
-        @core.stop_instance(instance.instance_id)
+      @instance.instances_hash({ Name: options[:name] }, false).each do |instance|
+        @instance.stop_instance(instance.instance_id)
       end
     end
 
@@ -548,13 +546,13 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :load_balancer_name, aliases: '-l', type: :string, default: '', required: true, desc: 'name tag'
     def connect_elb(_name = options[:name])
-      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
+      @instance.instances_hash({ Name: options[:name] }, true).each do |instance|
         option = { load_balancer_name: options[:load_balancer_name], instances: [instance_id: instance.instance_id] }
-        @elb.deregister_instances_from_load_balancer(option)
-        @elb.register_instances_with_load_balancer(option)
+        @core.elb_client.deregister_instances_from_load_balancer(option)
+        @core.elb_client.register_instances_with_load_balancer(option)
         print 'connecting ELB...'
         loop do
-          break if 'InService' == @elb.describe_instance_health(option).instance_states.first.state
+          break if 'InService' == @core.elb_client.describe_instance_health(option).instance_states.first.state
           sleep 10
           print '.'
         end
@@ -565,22 +563,22 @@ module Ec2ex
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :load_balancer_name, aliases: '-l', type: :string, default: '', required: true, desc: 'name tag'
     def disconnect_elb
-      @core.instances_hash({ Name: options[:name] }, true).each do |instance|
+      @instance.instances_hash({ Name: options[:name] }, true).each do |instance|
         option = { load_balancer_name: options[:load_balancer_name], instances: [instance_id: instance.instance_id] }
-        @elb.deregister_instances_from_load_balancer(option)
+        @core.elb_client.deregister_instances_from_load_balancer(option)
       end
     end
 
     desc 'elbs', 'show elbs'
     def elbs
-      puts_json @elb.describe_load_balancers.data.to_h[:load_balancer_descriptions]
+      puts_json @core.elb_client.describe_load_balancers.data.to_h[:load_balancer_descriptions]
     end
 
     desc 'events', 'show events'
     def events
       results = []
-      @core.instances_hash({}, true).each do |i|
-        status = @ec2.describe_instance_status(instance_ids: [i.instance_id])
+      @instance.instances_hash({}, true).each do |i|
+        status = @core.client.describe_instance_status(instance_ids: [i.instance_id])
         events = status.data[:instance_status_set][0][:events] rescue nil
         next if events.nil? or events.empty?
         events.each do |event|
@@ -626,7 +624,7 @@ module Ec2ex
 
     private
     def instances(name, _running_only = true)
-      @ec2.instances.with_tag('Name', "#{name}")
+      @core.client.instances.with_tag('Name', "#{name}")
     end
 
     def puts_json(data)
