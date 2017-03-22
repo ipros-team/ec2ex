@@ -8,23 +8,16 @@ end
 
 module Ec2ex
   class Core
+
+    attr_reader :client
+    attr_reader :logger
+    attr_reader :elb_client
+
     def initialize
       ENV['AWS_REGION'] = ENV['AWS_REGION'] || Metadata.get_document['region']
-      @ec2 = Aws::EC2::Client.new
-      @elb = Aws::ElasticLoadBalancing::Client.new
+      @client = Aws::EC2::Client.new
+      @elb_client = Aws::ElasticLoadBalancing::Client.new
       @logger = Logger.new(STDOUT);
-    end
-
-    def client
-      @ec2
-    end
-
-    def logger
-      @logger
-    end
-
-    def elb_client
-      @elb
     end
 
     def instances_hash(condition, running_only = true)
@@ -37,7 +30,7 @@ module Ec2ex
       else
         filter << { name: 'instance-state-name', values: %w(running stopped) }
       end
-      @ec2.describe_instances(
+      @client.describe_instances(
         filters: filter
       ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }
     end
@@ -53,7 +46,7 @@ module Ec2ex
     end
 
     def instances_hash_with_id(instance_id)
-      @ec2.describe_instances(
+      @client.describe_instances(
         instance_ids: [instance_id]
       ).data.to_h[:reservations].map { |instance| Ec2exMash.new(instance[:instances].first) }.first
     end
@@ -62,18 +55,18 @@ module Ec2ex
       @logger.info "spot instance creating..."
       instance_id = nil
       while true
-        spot_instance_request = @ec2.describe_spot_instance_requests(spot_instance_request_ids: [spot_instance_request_id]).spot_instance_requests.first
+        spot_instance_request = @client.describe_spot_instance_requests(spot_instance_request_ids: [spot_instance_request_id]).spot_instance_requests.first
         if spot_instance_request.state == 'active'
           instance_id = spot_instance_request.instance_id
           break
         elsif spot_instance_request.state == 'failed'
           @logger.info spot_instance_request.fault.code
-          @ec2.cancel_spot_instance_requests({ spot_instance_request_ids: [spot_instance_request_id] })
+          @client.cancel_spot_instance_requests({ spot_instance_request_ids: [spot_instance_request_id] })
           raise spot_instance_request.fault.message
         end
         sleep 10
       end
-      @ec2.wait_until(:instance_running, instance_ids: [instance_id]) do |w|
+      @client.wait_until(:instance_running, instance_ids: [instance_id]) do |w|
         w.interval = 15
         w.max_attempts = 1440
       end
@@ -85,7 +78,7 @@ module Ec2ex
     def wait_instance_status_ok(instance_id)
       @logger.info "waiting instance status ok... instance_id => [#{instance_id}]"
       while true
-        res = @ec2.describe_instance_status(instance_ids: [instance_id])
+        res = @client.describe_instance_status(instance_ids: [instance_id])
         instance_status = res.instance_statuses.first.instance_status.status
         if instance_status == 'ok'
           break
@@ -103,33 +96,33 @@ module Ec2ex
           ebs: { volume_id: block_device_mapping.ebs.volume_id, delete_on_termination: true }
         }
       }
-      @ec2.modify_instance_attribute({instance_id: instance.instance_id, block_device_mappings: block_device_mappings})
+      @client.modify_instance_attribute({instance_id: instance.instance_id, block_device_mappings: block_device_mappings})
     end
 
     def stop_instance(instance_id)
       @logger.info 'stopping...'
-      @ec2.stop_instances(
+      @client.stop_instances(
         instance_ids: [instance_id],
         force: true
       )
-      @ec2.wait_until(:instance_stopped, instance_ids: [instance_id])
+      @client.wait_until(:instance_stopped, instance_ids: [instance_id])
       @logger.info "stop instance complete! instance_id => [#{instance_id}]"
     end
 
     def start_instance(instance_id)
       @logger.info 'starting...'
-      @ec2.start_instances(
+      @client.start_instances(
         instance_ids: [instance_id]
       )
-      @ec2.wait_until(:instance_running, instance_ids: [instance_id])
+      @client.wait_until(:instance_running, instance_ids: [instance_id])
       @logger.info "start instance complete! instance_id => [#{instance_id}]"
     end
 
     def terminate_instance(instance)
       instance_id = instance.instance_id
       @logger.info 'terminating...'
-      @ec2.terminate_instances(instance_ids: [instance_id])
-      @ec2.wait_until(:instance_terminated, instance_ids: [instance_id])
+      @client.terminate_instances(instance_ids: [instance_id])
+      @client.wait_until(:instance_terminated, instance_ids: [instance_id])
       @logger.info "terminate instance complete! instance_id => [#{instance_id}]"
     end
   end
