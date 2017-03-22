@@ -182,7 +182,7 @@ module Ec2ex
           end
           @core.wait_instance_status_ok(instance_id) if is_last
 
-          public_ip_address = get_public_ip_address(options[:public_ip_address], instance.public_ip_address, false)
+          public_ip_address = @network.get_public_ip_address(options[:public_ip_address], instance.public_ip_address, false)
           @network.associate_address(instance_id, public_ip_address)
           @logger.info("created instance => #{instance_id}")
         end
@@ -329,7 +329,7 @@ module Ec2ex
 
           @core.wait_instance_status_ok(instance_id) if is_last
 
-          public_ip_address = get_public_ip_address(options[:public_ip_address], instance.public_ip_address, options[:renew])
+          public_ip_address = @network.get_public_ip_address(options[:public_ip_address], instance.public_ip_address, options[:renew])
           @network.associate_address(instance_id, public_ip_address)
         end
       end
@@ -675,19 +675,6 @@ module Ec2ex
         data = Util.extract_fields(data, @global_options[:fields])
       end
       puts JSON.pretty_generate(data)
-    end
-
-    def get_public_ip_address(define_public_ip_address, instance_public_ip_address, renew)
-      public_ip_address = nil
-      if define_public_ip_address == 'auto'
-        allocate_address_result = @network.allocate_address_vpc
-        public_ip_address = allocate_address_result.public_ip
-      elsif define_public_ip_address.nil?
-        public_ip_address = instance_public_ip_address if renew
-      else
-        public_ip_address = define_public_ip_address
-      end
-      public_ip_address
     end
   end
 end
