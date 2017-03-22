@@ -27,23 +27,6 @@ module Ec2ex
       @elb
     end
 
-    def extract_fields(data, fields)
-      results = []
-      data.each do |row|
-        row = Ec2exMash.new(row) if row.class == Hash
-        result = {}
-        fields.map { |key|
-          result[key] = eval("row.#{key}")
-        }
-        results << result
-      end
-      results
-    end
-
-    def group_count(list)
-      Hash[list.group_by { |e| e }.map { |k, v| [k, v.length] }]
-    end
-
     def instances_hash(condition, running_only = true)
       filter = []
       condition.each do |key, value|

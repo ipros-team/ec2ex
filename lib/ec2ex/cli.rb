@@ -46,8 +46,9 @@ module Ec2ex
       filter << { name: 'state', values: ['active'] }
       reserved_hash = {}
       @ec2.describe_reserved_instances(filters: filter)[:reserved_instances].each{ |reserved|
-        sum = reserved_hash[reserved[:instance_type] + '_' + reserved[:availability_zone]] || 0
-        reserved_hash[reserved[:instance_type] + '_' + reserved[:availability_zone]] = sum + reserved[:instance_count]
+        key = "#{reserved[:instance_type]}_#{reserved[:availability_zone]}"
+        sum = reserved_hash[key] || 0
+        reserved_hash[key] = sum + reserved[:instance_count]
       }
       list = @core.instances_hash({}, true).select { |instance| instance[:instance_lifecycle].nil? }
       list = list.map{ |_instance|
@@ -56,7 +57,7 @@ module Ec2ex
         end.join('_')
       }
       result = {}
-      @core.group_count(list).each do |k, v|
+      Util.group_count(list).each do |k, v|
         result[k] = { instance_count: v, reserved_count: 0 }
       end
       reserved_hash.each do |k, v|
@@ -671,7 +672,7 @@ module Ec2ex
 
     def puts_json(data)
       unless @global_options[:fields].nil?
-        data = @core.extract_fields(data, @global_options[:fields])
+        data = Util.extract_fields(data, @global_options[:fields])
       end
       puts JSON.pretty_generate(data)
     end
