@@ -3,6 +3,10 @@ require 'net/ping'
 
 module Ec2ex
   class Network
+    def initialize(core)
+      @core = core
+    end
+
     def get_public_ip_address(define_public_ip_address, instance_public_ip_address, renew)
       public_ip_address = nil
       if define_public_ip_address == 'auto'
@@ -14,10 +18,6 @@ module Ec2ex
         public_ip_address = define_public_ip_address
       end
       public_ip_address
-    end
-
-    def initialize(core)
-      @core = core
     end
 
     def get_allocation(public_ip_address)
