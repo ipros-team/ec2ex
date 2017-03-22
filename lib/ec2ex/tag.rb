@@ -1,5 +1,5 @@
 module Ec2ex
-  class Tag
+  class Tag < Base
     class << self
       def format(tag, preset_tag_hash = {})
         tags = []
@@ -39,10 +39,6 @@ module Ec2ex
         end
         ami_tag_hash
       end
-    end
-
-    def initialize(core)
-      @core = core
     end
 
     def get_hash_from_id(instance_id)

@@ -7,11 +7,7 @@ class Ec2exMash < Hashie::Mash
 end
 
 module Ec2ex
-  class Instance
-
-    def initialize(core)
-      @core = core
-    end
+  class Instance < Base
 
     def instances_hash(condition, running_only = true)
       filter = []

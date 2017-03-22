@@ -2,11 +2,7 @@ require 'ipaddress'
 require 'net/ping'
 
 module Ec2ex
-  class Network
-    def initialize(core)
-      @core = core
-    end
-
+  class Network < Base
     def get_public_ip_address(define_public_ip_address, instance_public_ip_address, renew)
       public_ip_address = nil
       if define_public_ip_address == 'auto'
