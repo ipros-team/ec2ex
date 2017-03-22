@@ -1,9 +1,6 @@
 require 'aws-sdk'
-require 'ipaddress'
-require 'open-uri'
 require "logger"
 require 'hashie/mash'
-require 'net/ping'
 
 class Ec2exMash < Hashie::Mash
   disable_warnings if respond_to?(:disable_warnings)
@@ -12,7 +9,7 @@ end
 module Ec2ex
   class Core
     def initialize
-      ENV['AWS_REGION'] = ENV['AWS_REGION'] || get_document['region']
+      ENV['AWS_REGION'] = ENV['AWS_REGION'] || Metadata.get_document['region']
       @ec2 = Aws::EC2::Client.new
       @elb = Aws::ElasticLoadBalancing::Client.new
       @logger = Logger.new(STDOUT);
@@ -24,23 +21,6 @@ module Ec2ex
 
     def logger
       @logger
-    end
-
-    def get_document
-      JSON.parse(get_metadata('/latest/dynamic/instance-identity/document/'))
-    end
-
-    def get_metadata(path)
-      begin
-        result = {}
-        ::Timeout.timeout(TIME_OUT) {
-          body = open('http://169.254.169.254' + path).read
-          return body
-        }
-        return result
-      rescue Timeout::Error => e
-        raise "not EC2 instance"
-      end
     end
 
     def elb_client
@@ -143,18 +123,6 @@ module Ec2ex
       @ec2.modify_instance_attribute({instance_id: instance.instance_id, block_device_mappings: block_device_mappings})
     end
 
-    def get_allocation(public_ip_address)
-      @ec2.describe_addresses(public_ips: [public_ip_address]).addresses.first
-    end
-
-    def get_subnet(private_ip_address)
-      subnets = @ec2.describe_subnets.subnets.select{ |subnet|
-        ip = IPAddress(subnet.cidr_block)
-        ip.to_a.map { |ipv4| ipv4.address }.include?(private_ip_address)
-      }
-      subnets.first
-    end
-
     def stop_instance(instance_id)
       @logger.info 'stopping...'
       @ec2.stop_instances(
@@ -180,28 +148,6 @@ module Ec2ex
       @ec2.terminate_instances(instance_ids: [instance_id])
       @ec2.wait_until(:instance_terminated, instance_ids: [instance_id])
       @logger.info "terminate instance complete! instance_id => [#{instance_id}]"
-    end
-
-    def associate_address(instance_id, public_ip_address)
-      unless public_ip_address.nil?
-        allocation_id = get_allocation(public_ip_address).allocation_id
-        resp = @ec2.associate_address(instance_id: instance_id, allocation_id: allocation_id)
-      end
-    end
-
-    def ping?(private_ip_address)
-      if private_ip_address
-        pinger = Net::Ping::External.new(private_ip_address)
-        if pinger.ping?
-          @logger.info "already exists private_ip_address => #{private_ip_address}"
-          return true
-        end
-      end
-      return false
-    end
-
-    def allocate_address_vpc
-      @ec2.allocate_address(domain: 'vpc').data
     end
   end
 end

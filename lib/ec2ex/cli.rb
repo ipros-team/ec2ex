@@ -21,6 +21,7 @@ module Ec2ex
       @elb = @core.elb_client
       @tag = Tag.new(@core)
       @ami = Ami.new(@core)
+      @network = Network.new(@core)
       @logger = @core.logger
     end
 
@@ -158,7 +159,7 @@ module Ec2ex
 
           request.merge!(eval(options[:params]))
           request[:subnet_id] = if request[:private_ip_address]
-            @core.get_subnet(request[:private_ip_address]).subnet_id
+            @network.get_subnet(request[:private_ip_address]).subnet_id
           else
             instance.subnet_id
           end
@@ -181,7 +182,7 @@ module Ec2ex
           @core.wait_instance_status_ok(instance_id) if is_last
 
           public_ip_address = get_public_ip_address(options[:public_ip_address], instance.public_ip_address, false)
-          @core.associate_address(instance_id, public_ip_address)
+          @network.associate_address(instance_id, public_ip_address)
           @logger.info("created instance => #{instance_id}")
         end
       end
@@ -222,7 +223,7 @@ module Ec2ex
           request[:key_name] = instance.key_name
         end
         request.merge!(params)
-        request[:subnet_id] = @core.get_subnet(request[:private_ip_address]).subnet_id
+        request[:subnet_id] = @network.get_subnet(request[:private_ip_address]).subnet_id
 
         response = @ec2.run_instances(request)
         instance_id = response.instances.first.instance_id
@@ -230,7 +231,7 @@ module Ec2ex
         @ec2.wait_until(:instance_running, instance_ids: [instance_id])
         @ec2.create_tags(resources: [instance_id], tags: instance.tags)
 
-        @core.associate_address(instance_id, instance.public_ip_address)
+        @network.associate_address(instance_id, instance.public_ip_address)
       end
     end
 
@@ -292,7 +293,7 @@ module Ec2ex
           if private_ip_address
             network_interface = {
               device_index: 0,
-              subnet_id: @core.get_subnet(private_ip_address).subnet_id,
+              subnet_id: @network.get_subnet(private_ip_address).subnet_id,
               groups: option[:launch_specification][:security_group_ids],
               private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
             }
@@ -328,7 +329,7 @@ module Ec2ex
           @core.wait_instance_status_ok(instance_id) if is_last
 
           public_ip_address = get_public_ip_address(options[:public_ip_address], instance.public_ip_address, options[:renew])
-          @core.associate_address(instance_id, public_ip_address)
+          @network.associate_address(instance_id, public_ip_address)
         end
       end
     end
@@ -348,9 +349,9 @@ module Ec2ex
       instance_count = options[:instance_count]
 
       private_ip_address = options[:private_ip_address] || tag_hash.private_ip_address
-      subnet_id = @core.get_subnet(private_ip_address).subnet_id
+      subnet_id = @network.get_subnet(private_ip_address).subnet_id
       if instance_count == 1
-        exit 0 if @core.ping?(private_ip_address)
+        exit 0 if @network.ping?(private_ip_address)
       else
         private_ip_address = nil
       end
@@ -415,7 +416,7 @@ module Ec2ex
         end
 
         if tag_hash.public_ip_address
-          @core.associate_address(instance_id, tag_hash.public_ip_address)
+          @network.associate_address(instance_id, tag_hash.public_ip_address)
         end
       end
     end
@@ -641,14 +642,14 @@ module Ec2ex
 
     desc 'allocate_address', 'allocate address'
     def allocate_address_vpc
-      response = @core.allocate_address_vpc
+      response = @network.allocate_address_vpc
       puts response.data
     end
 
     desc 'instance_metadata', 'instance metadata'
     option :path, type: :string, required: true, desc: 'path'
     def instance_metadata
-      response = @core.get_metadata(options[:path])
+      response = Metadata.get_metadata(options[:path])
       puts response
     end
 
@@ -678,7 +679,7 @@ module Ec2ex
     def get_public_ip_address(define_public_ip_address, instance_public_ip_address, renew)
       public_ip_address = nil
       if define_public_ip_address == 'auto'
-        allocate_address_result = @core.allocate_address_vpc
+        allocate_address_result = @network.allocate_address_vpc
         public_ip_address = allocate_address_result.public_ip
       elsif define_public_ip_address.nil?
         public_ip_address = instance_public_ip_address if renew
