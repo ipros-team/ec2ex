@@ -194,7 +194,7 @@ module Ec2ex
               network_interface = {
                 device_index: 0,
                 subnet_id: @network.get_subnet(private_ip_address).subnet_id,
-                groups: option[:launch_specification][:security_group_ids],
+                groups: security_group_ids,
                 private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
               }
               option[:launch_specification][:network_interfaces] = [network_interface]
