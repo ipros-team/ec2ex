@@ -15,6 +15,7 @@ module Ec2ex
 
         tag_hash = Tag.get_hash(image[:tags])
         instance_count = options[:instance_count]
+        in_threads = (instance_count > 20) ? 20 : instance_count
 
         private_ip_address = options[:private_ip_address] || tag_hash.private_ip_address
         subnet_id = @network.get_subnet(private_ip_address).subnet_id
@@ -24,67 +25,70 @@ module Ec2ex
           private_ip_address = nil
         end
 
-        in_threads = (instance_count > 20) ? 20 : instance_count
-
-        Parallel.map(instance_count.times.to_a, in_threads: in_threads) do |server_index|
-          option = {
-            instance_count: 1,
-            spot_price: options[:price],
-            launch_specification: {
-              image_id: image[:image_id],
-              instance_type: tag_hash.instance_type
-            },
-          }
-
-          option[:block_duration_minutes] = options[:block_duration_minutes] if options[:block_duration_minutes]
-
-          if private_ip_address
-            network_interface = {
-              device_index: 0,
-              subnet_id: subnet_id,
-              groups: JSON.parse(tag_hash.security_groups),
-              private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
+        groups = instance_count.times.to_a.each_slice(in_threads).to_a
+        groups.each do |group|
+          is_last = (groups.last == group)
+          Parallel.map(instance_count.times.to_a, in_threads: in_threads) do |server_index|
+            option = {
+              instance_count: 1,
+              spot_price: options[:price],
+              launch_specification: {
+                image_id: image[:image_id],
+                instance_type: tag_hash.instance_type
+              },
             }
-            option[:launch_specification][:network_interfaces] = [network_interface]
-          else
-            option[:launch_specification][:security_group_ids] = JSON.parse(tag_hash.security_groups)
-            option[:launch_specification][:subnet_id] = subnet_id
-          end
 
-          if tag_hash.iam_instance_profile
-            option[:launch_specification][:iam_instance_profile] = { name: tag_hash.iam_instance_profile }
-          end
+            option[:block_duration_minutes] = options[:block_duration_minutes] if options[:block_duration_minutes]
 
-          if tag_hash.key_name
-            option[:launch_specification][:key_name] = tag_hash.key_name
-          end
+            if private_ip_address
+              network_interface = {
+                device_index: 0,
+                subnet_id: subnet_id,
+                groups: JSON.parse(tag_hash.security_groups),
+                private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
+              }
+              option[:launch_specification][:network_interfaces] = [network_interface]
+            else
+              option[:launch_specification][:security_group_ids] = JSON.parse(tag_hash.security_groups)
+              option[:launch_specification][:subnet_id] = subnet_id
+            end
 
-          option[:launch_specification].merge!(eval(options[:params]))
+            if tag_hash.iam_instance_profile
+              option[:launch_specification][:iam_instance_profile] = { name: tag_hash.iam_instance_profile }
+            end
 
-          response = @core.client.request_spot_instances(option)
-          spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
-          sleep 5
-          instance_id = @instance.wait_spot_running(spot_instance_request_id)
-          @instance.set_delete_on_termination(@instance.instances_hash_with_id(instance_id))
-          @core.client.create_tags(
-            resources: [instance_id],
-            tags: Tag.format(JSON.parse(tag_hash.tags))
-          )
-          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
-          @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
+            if tag_hash.key_name
+              option[:launch_specification][:key_name] = tag_hash.key_name
+            end
 
-          unless options[:tag].empty?
+            option[:launch_specification].merge!(eval(options[:params]))
+
+            response = @core.client.request_spot_instances(option)
+            spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
+            sleep 5
+            instance_id = @instance.wait_spot_running(spot_instance_request_id)
+            @instance.set_delete_on_termination(@instance.instances_hash_with_id(instance_id))
             @core.client.create_tags(
               resources: [instance_id],
-              tags: Tag.format(
-                options[:tag],
-                @tag.get_hash_from_id(instance_id)
-              )
+              tags: Tag.format(JSON.parse(tag_hash.tags))
             )
-          end
+            @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
+            @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
 
-          if tag_hash.public_ip_address
-            @network.associate_address(instance_id, tag_hash.public_ip_address)
+            unless options[:tag].empty?
+              @core.client.create_tags(
+                resources: [instance_id],
+                tags: Tag.format(
+                  options[:tag],
+                  @tag.get_hash_from_id(instance_id)
+                )
+              )
+            end
+
+            if tag_hash.public_ip_address
+              @network.associate_address(instance_id, tag_hash.public_ip_address)
+            end
+            @instance.wait_instance_status_ok(instance_id) if is_last
           end
         end
       end
