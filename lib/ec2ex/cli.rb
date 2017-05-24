@@ -23,6 +23,7 @@ module Ec2ex
       @network = Network.new(@core)
       @instance = Instance.new(@core)
       @creator = Instance::Creator.new(@core)
+      @alb = Alb.new(@core)
     end
 
     desc 'search', 'search instance'
@@ -291,6 +292,13 @@ module Ec2ex
       @instance.instances_hash({ Name: options[:name] }, false).each do |instance|
         @instance.stop_instance(instance.instance_id)
       end
+    end
+
+    desc 'connect alb', 'connect alb'
+    option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
+    option :target_group_name, aliases: '-t', type: :string, default: '', required: true, desc: 'target group name'
+    def connect_alb
+      @alb.connect(options)
     end
 
     desc 'connect elb', 'connect elb'
