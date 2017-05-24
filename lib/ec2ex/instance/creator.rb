@@ -63,6 +63,7 @@ module Ec2ex
 
             option[:launch_specification].merge!(eval(options[:params]))
 
+            @core.logger.info("option => #{option}")
             response = @core.client.request_spot_instances(option)
             spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
             sleep 5
@@ -209,6 +210,7 @@ module Ec2ex
             option[:launch_specification].merge!(eval(options[:params]))
             @instance.terminate_instance(instance) if options[:renew]
 
+            @core.logger.info("option => #{option}")
             response = @core.client.request_spot_instances(option)
             spot_instance_request_id = response.spot_instance_requests.first.spot_instance_request_id
             sleep 5
