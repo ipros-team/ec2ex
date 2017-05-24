@@ -10,7 +10,7 @@ module Ec2ex
       resp = @alb_client.describe_target_groups({ names: [options[:target_group_name]] })
       target_group_arn = resp.target_groups.first.target_group_arn
       @instance.instances_hash({ Name: options[:name] }, true).each do |instance|
-        print 'connecting ALB...'
+        print "connecting #{options[:name]} to #{options[:target_group_name]}"
         @alb_client.register_targets({
           target_group_arn: target_group_arn,
           targets: [{ id: instance['instance_id'] }]
