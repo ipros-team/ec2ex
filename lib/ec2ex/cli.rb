@@ -381,6 +381,18 @@ module Ec2ex
       end
     end
 
+    desc 'price', 'price'
+    option :instance_types, required: true, type: :array, desc: 'instance types'
+    option :availability_zone, required: true, type: :string, desc: 'availability zone'
+    def spot_price_history
+      puts_json(
+        @instance.spot_price_history_latest(
+          instance_types: options[:instance_types],
+          availability_zone: options[:availability_zone]
+        )
+      )
+    end
+
     private
     def instances(name, _running_only = true)
       @core.client.instances.with_tag('Name', "#{name}")

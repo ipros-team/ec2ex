@@ -133,5 +133,18 @@ module Ec2ex
       end
       result
     end
+
+    def spot_price_history_latest(instance_types:, availability_zone:)
+      resp = @core.client.describe_spot_price_history({
+        start_time: Time.now,
+        end_time: Time.now,
+        instance_types: instance_types,
+        availability_zone: availability_zone,
+        product_descriptions: [
+          "Linux/UNIX (Amazon VPC)",
+        ],
+      })
+      resp.to_h[:spot_price_history]
+    end
   end
 end
