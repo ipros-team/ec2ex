@@ -146,5 +146,16 @@ module Ec2ex
       })
       resp.to_h[:spot_price_history]
     end
+
+    def min_price_instance_type(instance_types:, availability_zone:)
+      resp = spot_price_history_latest(
+        instance_types: instance_types,
+        availability_zone: availability_zone
+      )
+      min_history = resp.min_by {|history| history[:spot_price].to_f }
+      calc_instance_type = min_history[:instance_type]
+      @core.logger.info "#{calc_instance_type}, price => [#{min_history[:spot_price]}]"
+      calc_instance_type
+    end
   end
 end

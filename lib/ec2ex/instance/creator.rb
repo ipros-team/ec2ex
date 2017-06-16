@@ -18,12 +18,22 @@ module Ec2ex
         in_threads = (instance_count > 20) ? 20 : instance_count
 
         private_ip_address = options[:private_ip_address] || tag_hash.private_ip_address
-        subnet_id = @network.get_subnet(private_ip_address).subnet_id
+
         if instance_count == 1
           exit 0 if @network.ping?(private_ip_address)
         else
           private_ip_address = nil
         end
+
+        subnet = @network.get_subnet(private_ip_address)
+        subnet_id = subnet.subnet_id
+
+        availability_zone = subnet.availability_zone
+        instance_types = [tag_hash.instance_type].concat(options[:instance_types])
+        min_price_instance_type = @instance.min_price_instance_type(
+          instance_types: instance_types,
+          availability_zone: availability_zone
+        )
 
         groups = instance_count.times.to_a.each_slice(in_threads).to_a
         groups.each do |group|
@@ -34,7 +44,7 @@ module Ec2ex
               spot_price: options[:price],
               launch_specification: {
                 image_id: image[:image_id],
-                instance_type: tag_hash.instance_type
+                instance_type: min_price_instance_type
               },
             }
 
@@ -155,6 +165,22 @@ module Ec2ex
 
       def spot(options)
         instance = @instance.instances_hash_first_result({ Name: options[:name] }, true)
+
+        private_ip_address = nil
+        if options[:private_ip_address].nil?
+          private_ip_address = instance.private_ip_address if options[:renew]
+        else
+          private_ip_address = options[:private_ip_address]
+        end
+
+        subnet = @network.get_subnet(private_ip_address)
+        availability_zone = subnet.availability_zone
+        instance_types = [instance.instance_type].concat(options[:instance_types])
+        min_price_instance_type = @instance.min_price_instance_type(
+          instance_types: instance_types,
+          availability_zone: availability_zone
+        )
+
         if options[:stop]
           @instance.stop_instance(instance.instance_id)
         end
@@ -174,7 +200,7 @@ module Ec2ex
               spot_price: options[:price],
               launch_specification: {
                 image_id: image_id,
-                instance_type: instance.instance_type
+                instance_type: min_price_instance_type
               }
             }
             option[:type] = 'persistent' if options[:persistent]
@@ -188,17 +214,10 @@ module Ec2ex
               option[:launch_specification][:key_name] = instance.key_name
             end
 
-            private_ip_address = nil
-            if options[:private_ip_address].nil?
-              private_ip_address = instance.private_ip_address if options[:renew]
-            else
-              private_ip_address = options[:private_ip_address]
-            end
-
             if private_ip_address
               network_interface = {
                 device_index: 0,
-                subnet_id: @network.get_subnet(private_ip_address).subnet_id,
+                subnet_id: subnet.subnet_id,
                 groups: security_group_ids,
                 private_ip_addresses: [{ private_ip_address: private_ip_address, primary: true }]
               }

@@ -115,6 +115,7 @@ module Ec2ex
     option :stop, type: :boolean, default: false, desc: 'stop'
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
+    option :instance_types, type: :array, default: [], desc: 'instance types'
     def spot
       @creator.spot(options)
     end
@@ -127,6 +128,7 @@ module Ec2ex
     option :block_duration_minutes, type: :numeric, default: nil, desc: 'block_duration_minutes'
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'tag'
+    option :instance_types, type: :array, default: [], desc: 'instance types'
     def run_spot
       @creator.run_spot(options)
     end
