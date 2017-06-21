@@ -122,7 +122,7 @@ module Ec2ex
           private_ip_address = options[:private_ip_address]
         end
 
-        subnet = @network.get_subnet(private_ip_address)
+        subnet = @network.get_subnet(private_ip_address) || @network.get_subnet_with_id(instance.subnet_id)
         availability_zone = subnet.availability_zone
         instance_types = [instance.instance_type].concat(options[:instance_types])
         min_price_instance_type = @instance.min_price_instance_type(

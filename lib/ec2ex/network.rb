@@ -28,6 +28,11 @@ module Ec2ex
       subnets.first
     end
 
+    def get_subnet_with_id(subnet_id)
+      subnets = @core.client.describe_subnets(subnet_ids: [subnet_id]).subnets
+      subnets.first
+    end
+
     def associate_address(instance_id, public_ip_address)
       unless public_ip_address.nil?
         allocation_id = get_allocation(public_ip_address).allocation_id
