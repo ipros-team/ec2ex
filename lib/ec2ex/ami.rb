@@ -106,6 +106,12 @@ module Ec2ex
       ).data.to_h[:images]
     end
 
+    def search_image_with_id(image_id)
+      @core.client.describe_images(
+        image_ids: [image_id]
+      ).data.to_h[:images].first
+    end
+
     def deregister_snapshot_no_related(owner_id)
       enable_snapshot_ids = []
       search_images('*').each do |image|

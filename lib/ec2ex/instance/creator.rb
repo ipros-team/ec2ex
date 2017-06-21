@@ -209,7 +209,11 @@ module Ec2ex
       end
 
       def run_spot(options)
-        image = @ami.latest_image_with_name(options[:name])
+        if options[:image_id]
+          image = @ami.search_image_with_id(options[:image_id])
+        else
+          image = @ami.latest_image_with_name(options[:name])
+        end
 
         tag_hash = Tag.get_hash(image[:tags])
         instance_count = options[:instance_count]

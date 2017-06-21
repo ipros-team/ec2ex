@@ -129,6 +129,7 @@ module Ec2ex
     option :instance_count, type: :numeric, default: 1, desc: 'instance_count'
     option :tag, aliases: '-t', type: :hash, default: {}, desc: 'tag'
     option :instance_types, type: :array, default: [], desc: 'instance types'
+    option :image_id, aliases: '-i', type: :string, desc: 'AMI image_id'
     def run_spot
       @creator.run_spot(options)
     end
