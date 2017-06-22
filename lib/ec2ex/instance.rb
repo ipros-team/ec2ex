@@ -112,13 +112,13 @@ module Ec2ex
       filter << { name: 'state', values: ['active'] }
       reserved_hash = {}
       @core.client.describe_reserved_instances(filters: filter)[:reserved_instances].each{ |reserved|
-        key = "#{reserved[:instance_type]}_#{reserved[:availability_zone]}"
+        key = "#{reserved[:instance_type]}"
         sum = reserved_hash[key] || 0
         reserved_hash[key] = sum + reserved[:instance_count]
       }
       list = instances_hash({}, true).select { |instance| instance[:instance_lifecycle].nil? }
       list = list.map{ |_instance|
-        ['instance_type', 'placement.availability_zone'].map do |key|
+        ['instance_type'].map do |key|
           eval("_instance.#{key} ")
         end.join('_')
       }
