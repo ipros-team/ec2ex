@@ -204,20 +204,40 @@ module Ec2ex
     desc 'copy_tag', 'request spot instances'
     option :source, aliases: '--src', type: :string, default: nil, required: true, desc: 'name tag'
     option :dest, aliases: '--dest', type: :string, default: nil, required: true, desc: 'name tag'
-    def copy_tag(_name = options[:name])
-      source = @instance.instances_hash({ Name: options[:source] }, true)
-      dest = @instance.instances_hash({ Name: options[:dest] }, true)
-      @core.client.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: source.first.tags)
-      @core.client.create_tags(resources: dest.map { |instance| instance.instance_id }, tags: [{ key: 'Name', value: options[:dest] }])
+    option :resource, aliases: '-r', type: :string, default: 'instance', enum: ['instance', 'ami'], desc: 'resource'
+    def copy_tag
+      source_tags = if options[:resource] == 'instance'
+        instance = @instance.instances_hash({ Name: options[:source] }, true).first
+        instance.tags
+      elsif options[:resource] == 'ami'
+        @ami.search_images(options[:source]).first[:tags]
+      end
+
+      dest_id = if options[:resource] == 'instance'
+        @instance.instances_hash({ Name: options[:dest] }, true).first.instance_id
+      elsif options[:resource] == 'ami'
+        @ami.search_images(options[:dest]).first[:image_id]
+      end
+
+      @core.client.create_tags(resources: [dest_id], tags: source_tags)
+      if options[:resource] == 'instance'
+        @core.client.create_tags(resources: [dest_id], tags: [{ key: 'Name', value: options[:dest] }])
+      end
     end
 
     desc 'set_tag', 'set tag'
     option :name, aliases: '-n', type: :string, required: true, desc: 'name tag'
     option :tag, aliases: '-t', type: :hash, required: true, desc: 'name tag'
+    option :resource, aliases: '-r', type: :string, default: 'instance', enum: ['instance', 'ami'], desc: 'resource'
     def set_tag
-      instances = @instance.instances_hash({ Name: options[:name] }, true)
+      ids = if options[:resource] == 'instance'
+        @instance.instances_hash({ Name: options[:name] }, true).map {  |instance| instance.instance_id }
+      elsif options[:resource] == 'ami'
+        @ami.search_images(options[:name]).map { |image| image[:image_id] }
+      end
+
       tags = Tag.format(options[:tag])
-      @core.client.create_tags(resources: instances.map { |instance| instance.instance_id }, tags: tags)
+      @core.client.create_tags(resources: ids, tags: tags)
     end
 
     desc 'set_delete_on_termination', 'set delete on termination instance'
