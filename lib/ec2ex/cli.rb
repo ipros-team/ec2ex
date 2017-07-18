@@ -3,6 +3,7 @@ require 'json'
 require 'pp'
 require 'parallel'
 require 'active_support/core_ext/hash'
+require 'terminal-table'
 
 module Ec2ex
   class CLI < Thor
@@ -29,9 +30,14 @@ module Ec2ex
     desc 'search', 'search instance'
     option :name, aliases: '-n', type: :string, default: '', required: true, desc: 'name tag'
     option :running_only, aliases: '--ro', type: :boolean, default: true, desc: 'search running only instances.'
+    option :output_format, aliases: '--of', type: :string, default: 'table', enum: ['table', 'json'], desc: 'output format'
     def search(name = options[:name])
       results = @instance.instances_hash({ Name: name }, options[:running_only])
-      puts_json results
+      if options[:output_format] == 'json'
+        puts_json results
+      elsif options[:output_format] == 'table'
+        puts_table results
+      end
     end
 
     desc 'search_by_tags', 'search by tags instance'
@@ -426,6 +432,22 @@ module Ec2ex
         data = Util.extract_fields(data, @global_options[:fields])
       end
       puts JSON.pretty_generate(data)
+    end
+
+    def puts_table(data)
+      headings = {
+        "instance_id" => 'instance_id',
+        "state" => 'state.name',
+        "Name" => 'tags.select{|tag| tag["key"] == "Name" }.first["value"]',
+        "instance_type" => 'instance_type',
+        "private_ip_address" => 'private_ip_address',
+        "availability_zone" => 'placement.availability_zone',
+        "instance_lifecycle" => 'instance_lifecycle'
+      }
+      rows = data.map do |row|
+        headings.values.map { |heading| eval("row.#{heading}") }
+      end
+      puts Terminal::Table.new :headings => headings.keys, :rows => rows
     end
   end
 end
