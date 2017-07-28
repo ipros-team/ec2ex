@@ -48,7 +48,8 @@ module Ec2ex
             response = @core.client.run_instances(request)
             instance_id = response.instances.first.instance_id
             @core.client.wait_until(:instance_running, instance_ids: [instance_id])
-            @core.client.create_tags(resources: [instance_id], tags: instance.tags)
+            filter_tags = instance.tags.select { |instance_tag| !instance_tag[:key].start_with?('aws:') }
+            @core.client.create_tags(resources: [instance_id], tags: filter_tags)
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
             unless options[:tag].nil?
@@ -106,7 +107,9 @@ module Ec2ex
           instance_id = response.instances.first.instance_id
           sleep 5
           @core.client.wait_until(:instance_running, instance_ids: [instance_id])
-          @core.client.create_tags(resources: [instance_id], tags: instance.tags)
+
+          filter_tags = instance.tags.select { |instance_tag| !instance_tag[:key].start_with?('aws:') }
+          @core.client.create_tags(resources: [instance_id], tags: filter_tags)
 
           @network.associate_address(instance_id, instance.public_ip_address)
         end
@@ -185,7 +188,8 @@ module Ec2ex
             instance_id = @instance.wait_spot_running(spot_instance_request_id)
             @instance.set_delete_on_termination(@instance.instances_hash_with_id(instance_id))
 
-            @core.client.create_tags(resources: [instance_id], tags: instance.tags)
+            filter_tags = instance.tags.select { |instance_tag| !instance_tag[:key].start_with?('aws:') }
+            @core.client.create_tags(resources: [instance_id], tags: filter_tags)
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'Spot', value: 'true' }])
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
@@ -281,9 +285,11 @@ module Ec2ex
             sleep 5
             instance_id = @instance.wait_spot_running(spot_instance_request_id)
             @instance.set_delete_on_termination(@instance.instances_hash_with_id(instance_id))
+
+            filter_tags = JSON.parse(tag_hash.tags).select { |k, v| !k.start_with?('aws:') }
             @core.client.create_tags(
               resources: [instance_id],
-              tags: Tag.format(JSON.parse(tag_hash.tags))
+              tags: Tag.format(filter_tags)
             )
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceIndex', value: "#{server_index}" }])
             @core.client.create_tags(resources: [instance_id], tags: [{ key: 'InstanceCount', value: "#{instance_count}" }])
