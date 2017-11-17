@@ -20,7 +20,7 @@ Gem::Specification.new do |gem|
   gem.add_dependency 'thor'
   gem.add_dependency 'hashie'
   gem.add_dependency 'ipaddress'
-  gem.add_dependency 'aws-sdk'
+  gem.add_dependency 'aws-sdk', '~> 2'
   gem.add_dependency 'activesupport'
   gem.add_dependency 'parallel'
   gem.add_dependency 'net-ping'
