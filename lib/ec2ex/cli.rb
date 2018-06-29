@@ -14,10 +14,11 @@ module Ec2ex
     map '-a' => :aggregate
 
     class_option :fields, type: :array, default: nil, desc: 'fields'
+    class_option :profile, type: :string, default: nil, desc: 'profile'
     def initialize(args = [], options = {}, config = {})
       super(args, options, config)
       @global_options = config[:shell].base.options
-      @core = Core.new
+      @core = Core.new(@global_options[:profile])
 
       @tag = Tag.new(@core)
       @ami = Ami.new(@core)
