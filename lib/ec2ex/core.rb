@@ -7,9 +7,12 @@ module Ec2ex
     attr_reader :elb_client
     attr_reader :logger
 
-    def initialize
-      ENV['AWS_REGION'] = ENV['AWS_REGION'] || Metadata.get_document['region']
-      @client = Aws::EC2::Client.new
+    def initialize(profile = nil)
+      begin
+        @client = Aws::EC2::Client.new(profile: profile)
+      rescue Aws::Errors::MissingRegionError => e
+        @client = Aws::EC2::Client.new(region: Metadata.get_document['region'])
+      end
       @elb_client = Aws::ElasticLoadBalancing::Client.new
       @logger = Logger.new(STDOUT)
     end
